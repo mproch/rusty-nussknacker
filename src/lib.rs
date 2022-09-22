@@ -3,17 +3,17 @@ pub mod runtime;
 pub mod scenario;
 pub mod expression;
 
-use runtime::data::{InputData, OutputData, ScenarioError};
+use runtime::data::{InputData, OutputData, ScenarioError, ScenarioError::*};
 use serde_json::Value;
 use std::collections::HashMap;
 
 pub fn interpret_scenario(file_name: &str, input_str: &str) -> Result<OutputData, ScenarioError> {
 
     fn map_error(_error: std::io::Error) -> ScenarioError {
-        return ScenarioError(String::from("Failed to read"))
+        return ScenarioRuntimeError(String::from("Failed to read"))
     }
     fn map_error_json(_error: serde_json::Error) -> ScenarioError {
-        return ScenarioError(String::from("Failed to read"))
+        return ScenarioRuntimeError(String::from("Failed to read"))
     }
 
     let scenario = data::parse::parse(&file_name).map_err(map_error)?;

@@ -2,7 +2,7 @@
 use core::panic;
 use std::collections::HashMap;
 
-use crate::{runtime::data::{ScenarioError, VarContext, InputData, VarValue}, data::jsonmodel::Expression};
+use crate::{runtime::data::{ScenarioError::*, ScenarioError, VarContext, InputData, VarValue}, data::jsonmodel::Expression};
 use super::CompiledExpression;
 use js_sandbox::Script;
 use serde_json::Value;
@@ -30,11 +30,12 @@ struct JavascriptExpression {
 
 impl CompiledExpression for JavascriptExpression {
     fn execute(&self, input_data: &InputData) -> Result<VarValue, ScenarioError> {
-        let mut expression = Script::from_string(&self.transformed).map_err(|err| ScenarioError(err.to_string()))?;
-        let converted = serde_json::to_value(&input_data.0).map_err(|err| ScenarioError(err.to_string()))?;
-        return expression.call::<Value, Value>("run", &converted).map_err(|err| ScenarioError(err.to_string()));    
+        let mut expression = Script::from_string(&self.transformed).map_err(|err| ScenarioRuntimeError(err.to_string()))?;
+        let converted = serde_json::to_value(&input_data.0).map_err(|err| ScenarioRuntimeError(err.to_string()))?;
+        return expression.call::<Value, Value>("run", &converted).map_err(|err| ScenarioRuntimeError(err.to_string()));    
     }
 }
+
 
 #[test]
 fn test_simple_expression() -> Result<(), ScenarioError> {

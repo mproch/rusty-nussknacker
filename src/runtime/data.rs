@@ -21,12 +21,16 @@ pub type Type = ();
 #[derive(Clone)]
 pub struct VarContext(pub HashMap<String, Type>);
 
+
 #[derive(Debug)]
-pub struct ScenarioError(pub String);
+pub enum ScenarioError {
+    ScenarioCompilationError( String),
+    ScenarioRuntimeError(String)
+}
 
 impl std::fmt::Display for ScenarioError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
+        write!(f, "{}", self.to_string())
     }
 }
 

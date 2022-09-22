@@ -1,6 +1,6 @@
 use crate::{data::jsonmodel::{Scenario, Node, Node::*, Expression, Case}, runtime::data::{OutputData, InputData}, expression::CompiledExpression};
 use serde_json::Value::Bool;
-use super::data::{ScenarioError, VarContext, VarValue};
+use super::data::{ScenarioError::{*, self}, VarContext, VarValue};
 use core::slice::Iter;
 use std::collections::HashMap;
 
@@ -8,7 +8,7 @@ pub fn compile(scenario: &Scenario) -> Result<Box<dyn Interpreter>, ScenarioErro
     let iter = &scenario.nodes;
     let initial_input = VarContext(HashMap::from([(String::from("input"), ())]));
     return match iter.first() {
-        Some(Source { id }) => compile_next(&iter[..], &initial_input),
+        Some(Source { id }) => compile_next(&iter[1..], &initial_input),
         _ => todo!("")
     };
 }
@@ -28,11 +28,11 @@ fn compile_next(iter: &[Node], var_names: &VarContext) -> Result<Box<dyn Interpr
 fn compile_variable(var_name: String, raw_expression: &Expression, iter: &[Node], var_names: &VarContext) -> Result<Box<dyn Interpreter>, ScenarioError> {
     let expression = crate::expression::parse::parse(raw_expression, &var_names)?;
     let mut new_names = var_names.clone();
+    //??clone
     new_names.0.insert(var_name.clone(), ());
     let rest = compile_next(iter, &new_names)?;
 
-    //??clone
-    let res = CompiledVariable { rest, expression, var_name: var_name.clone() };
+    let res = CompiledVariable { rest, expression, var_name: var_name };
     return Ok(Box::new(res));
 }
 
@@ -109,7 +109,7 @@ impl Interpreter for CompiledSwitch {
             let next_expression = case.expression.execute(data)?;
             let matches = (match next_expression {
                Bool(value) => Ok(value),
-                _ => Err(ScenarioError(String::from("Bad error type")))  
+                _ => Err(ScenarioRuntimeError(String::from("Bad error type")))  
             })?;
             if matches {
                 result = case.rest.run(data);
@@ -132,7 +132,7 @@ impl Interpreter for CompiledFilter {
         return match result {
             Bool(value) if value => self.rest.run(data),
             Bool(value) if !value => Ok(OutputData(vec![])),
-            _ => Err(ScenarioError(String::from("Bad error type")))  
+            _ => Err(ScenarioRuntimeError(String::from("Bad error type")))  
         }
     }
 }
