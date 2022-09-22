@@ -10,7 +10,7 @@ At the moment we assume JSON model. It's certainly simplification, but for the p
 */
 pub type VarValue = Value;
 
-pub type ScenarioInterpeter = fn(InputData) -> Result<OutputData, ScenarioError>;
+pub type ScenarioInterpeter = fn(&InputData) -> Result<OutputData, ScenarioError>;
 
 /* 
 We leave possiblity of typing variables, but for now we'll be only interested in variable presence, as it makes

@@ -22,6 +22,6 @@ pub fn interpret_scenario(file_name: &str, input_str: &str) -> Result<OutputData
     let input: Value = serde_json::from_str(input_str).map_err(map_error_json)?;
     let input_data: HashMap<String, Value> = HashMap::from([(String::from("input"), input)]);
 
-    return runtime(InputData(input_data));
+    return runtime(&InputData(input_data));
     
 }

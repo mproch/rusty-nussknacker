@@ -19,8 +19,8 @@ pub struct ServiceRef {
 
 #[derive(Serialize, Deserialize)]
 pub struct Case {
-    expression: Expression,
-    nodes: Vec<Node>
+    pub expression: Expression,
+    pub nodes: Vec<Node>
 }
 
 #[derive(Serialize, Deserialize)]
