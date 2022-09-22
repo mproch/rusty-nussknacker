@@ -9,12 +9,20 @@ pub enum Node {
     Split { id: String, nexts: Vec<Vec<Node>> },
     Sink { id: String },
     Variable { id: String, varName: String, expression: Expression },
-
+    Enricher { id: String, output: String, serviceRef: ServiceRef },
+    CustomNode { id: String, outputVar: String, nodeType: String, parameters: Vec<Parameter> }
 }
 
 #[derive(Serialize, Deserialize)]
 pub struct ServiceRef {
+    pub id: String,
+    pub parameters: Vec<Parameter>
+}
 
+#[derive(Serialize, Deserialize)]
+pub struct Parameter {
+    pub name: String,
+    expression: Expression
 }
 
 #[derive(Serialize, Deserialize)]
@@ -41,20 +49,3 @@ pub struct Scenario {
 pub struct MetaData {
     pub id: String
 }
-
-#[allow(dead_code)]
-enum NodeData {
-    Source,
-    Sink
-}
-
-/*
-enum Value {
-    Null,
-    Bool(bool),
-    Number(Number),
-    String(String),
-    Array(Vec<Value>),
-    Object(Map<String, Value>),
-}
-*/

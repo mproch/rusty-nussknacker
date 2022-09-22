@@ -17,6 +17,8 @@ We leave possiblity of typing variables, but for now we'll be only interested in
 JS evaluation simpler.
  */
 pub type Type = ();
+
+#[derive(Clone)]
 pub struct VarContext(pub HashMap<String, Type>);
 
 #[derive(Debug)]

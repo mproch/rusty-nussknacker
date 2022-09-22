@@ -2,7 +2,12 @@
     "metaData": {
         "id": "Sample"
     },
-    "nodes": [],
+    "nodes": [
+        { "type": "Source", "id": "start"},
+        { "type": "Variable", "id": "var", "varName": "newone", "expression": { "language": "javascript", "expression": "'Message ' + input.field2"}},
+        { "type": "Filter", "id": "filter", "expression": { "language": "javascript", "expression": "true"}},
+        { "type": "Sink", "id": "sink"}
+    ],
     "additionalBranches": []    
 
 }
