@@ -1,4 +1,4 @@
-use crate::runtime::data::{InputData, VarValue, ScenarioError::{*, self}, VarContext};
+use crate::runtime::data::{InputData, VarValue, ScenarioError, VarContext};
 
 pub mod parse;
 use crate::data::jsonmodel::Expression;

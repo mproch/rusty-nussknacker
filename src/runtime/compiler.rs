@@ -1,7 +1,6 @@
 use crate::{data::jsonmodel::{Scenario, Node, Node::*, Expression, Case}, runtime::data::{OutputData, InputData}, expression::CompiledExpression};
 use serde_json::Value::Bool;
 use super::data::{ScenarioError::{*, self}, VarContext, VarValue};
-use core::slice::Iter;
 use std::collections::HashMap;
 
 pub fn compile(scenario: &Scenario) -> Result<Box<dyn Interpreter>, ScenarioError> {
@@ -17,7 +16,7 @@ fn compile_next(iter: &[Node], var_names: &VarContext) -> Result<Box<dyn Interpr
     let rest = &iter[1..];
     match iter.first() {
         Some(Filter { id, expression }) => compile_filter(expression, rest, var_names),
-        Some(Variable { id, varName, expression }) => compile_variable(varName.to_string(), expression, rest, var_names),
+        Some(Variable { id, var_name, expression }) => compile_variable(var_name.to_string(), expression, rest, var_names),
         Some(Switch { id, nexts }) => compile_switch(nexts, var_names),
         Some(Split { id, nexts}) => compile_split(nexts, var_names),
         Some(Sink { id }) => Ok(Box::new(CompiledSink {})),
