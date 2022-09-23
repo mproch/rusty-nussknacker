@@ -7,31 +7,30 @@ pub fn compile(scenario: &Scenario) -> Result<Box<dyn Interpreter>, ScenarioErro
     let iter = &scenario.nodes;
     let initial_input = VarContext(HashMap::from([(String::from("input"), ())]));
     return match iter.first() {
-        Some(Source { id }) => compile_next(&iter[1..], &initial_input),
-        _ => todo!("")
+        Some(Source { id: _ }) => compile_next(&iter[1..], &initial_input),
+        _ => Err(ScenarioCompilationError(String::from("The first node has to be source")))
     };
 }
 
 fn compile_next(iter: &[Node], var_names: &VarContext) -> Result<Box<dyn Interpreter>, ScenarioError> {
+    //TODO: handle empty...
     let rest = &iter[1..];
     match iter.first() {
-        Some(Filter { id, expression }) => compile_filter(expression, rest, var_names),
-        Some(Variable { id, var_name, expression }) => compile_variable(var_name.to_string(), expression, rest, var_names),
-        Some(Switch { id, nexts }) => compile_switch(nexts, var_names),
-        Some(Split { id, nexts}) => compile_split(nexts, var_names),
-        Some(Sink { id }) => Ok(Box::new(CompiledSink {})),
-        _ => todo!("")
+        Some(Filter { id: _, expression }) => compile_filter(expression, rest, var_names),
+        Some(Variable { id: _, var_name, expression }) => compile_variable(var_name, expression, rest, var_names),
+        Some(Switch { id: _, nexts }) => compile_switch(nexts, var_names),
+        Some(Split { id: _, nexts}) => compile_split(nexts, var_names),
+        Some(Sink { id: _ }) => Ok(Box::new(CompiledSink {})),
+        _ => Err(ScenarioCompilationError(String::from("Unknown node")))
     }
 }
 
-fn compile_variable(var_name: String, raw_expression: &Expression, iter: &[Node], var_names: &VarContext) -> Result<Box<dyn Interpreter>, ScenarioError> {
+fn compile_variable(var_name: &str, raw_expression: &Expression, iter: &[Node], var_names: &VarContext) -> Result<Box<dyn Interpreter>, ScenarioError> {
     let expression = crate::expression::parse::parse(raw_expression, &var_names)?;
     let mut new_names = var_names.clone();
-    //??clone
-    new_names.0.insert(var_name.clone(), ());
+    new_names.0.insert(String::from(var_name), ());
     let rest = compile_next(iter, &new_names)?;
-
-    let res = CompiledVariable { rest, expression, var_name: var_name };
+    let res = CompiledVariable { rest, expression, var_name: String::from(var_name) };
     return Ok(Box::new(res));
 }
 
@@ -85,9 +84,9 @@ struct CompiledSplit {
 
 impl Interpreter for CompiledSplit {
     fn run(&self, data: & mut InputData) -> Result<OutputData, ScenarioError> {
+        //TODO: clone should be here?
         let res: Result<Vec<OutputData>, ScenarioError> = self.nexts.iter().map(|one| one.run(data)).collect();
-        //TODO: remove clone??
-        let flattened: Vec<VarValue> = (res?).iter().map(|o| o.0.clone()).flatten().collect();
+        let flattened: Vec<VarValue> = (res?).into_iter().map(|o| o.0).flatten().collect();
         return Ok(OutputData(flattened));
     }
 }
