@@ -11,5 +11,5 @@ fn main() {
     let input = args[2].clone();
     let output = interpret_scenario(&file_name, &input).unwrap().0;
     
-    println!("{}", serde_json::to_string(&output[0]).unwrap());
+    println!("{}", serde_json::to_string(&output).unwrap());
 }

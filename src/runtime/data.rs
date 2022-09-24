@@ -5,6 +5,12 @@ pub struct InputData(pub HashMap<String, VarValue>);
 
 pub struct OutputData(pub Vec<VarValue>);
 
+impl OutputData {
+    pub fn flatten(vec: Vec<OutputData>) -> OutputData {
+        return OutputData(vec.into_iter().map(|o| o.0).flatten().collect());    
+    }
+}
+
 /* 
 At the moment we assume JSON model. It's certainly simplification, but for the purpose of this excerise it should be enough;
 */
@@ -24,7 +30,7 @@ pub struct VarContext(pub HashMap<String, Type>);
 
 #[derive(Debug)]
 pub enum ScenarioError {
-    ScenarioCompilationError( String),
+    ScenarioCompilationError(String),
     ScenarioRuntimeError(String)
 }
 

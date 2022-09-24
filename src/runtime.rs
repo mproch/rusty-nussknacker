@@ -1,2 +1,10 @@
+use std::collections::HashMap;
+
+use self::{compiler::Interpreter, data::{ScenarioError, VarValue, OutputData, InputData}};
+
 pub mod data;
 pub mod compiler;
+
+pub trait CustomNodeImpl {
+    fn run(&self, output_var: &str, parameters: HashMap<String, VarValue>, input: &mut InputData, next_part: &Box<dyn Interpreter>) -> Result<OutputData, ScenarioError>;
+}

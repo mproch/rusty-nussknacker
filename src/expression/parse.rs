@@ -1,27 +1,20 @@
-
-use core::panic;
-use std::collections::HashMap;
-
-use crate::{runtime::data::{ScenarioError::*, ScenarioError, VarContext, InputData, VarValue}, data::jsonmodel::Expression};
-use super::CompiledExpression;
+use crate::{runtime::data::{ScenarioError::*, ScenarioError, VarContext, InputData, VarValue}};
+use super::{CompiledExpression, Parser};
 use js_sandbox::Script;
 use serde_json::Value;
 
-pub fn parse(expression: &Expression, var_context: &VarContext) -> Result<Box<dyn CompiledExpression>, ScenarioError> {
-    match expression.language.as_str() {
-        "javascript" => parse_javascript(&expression.expression, var_context),
-        _ => panic!("Unknown language")
-    }
-}
+pub struct JavaScriptParser;
 
-fn parse_javascript(expression: &str, var_context: &VarContext) -> Result<Box<dyn CompiledExpression>, ScenarioError>{
-    let keys = var_context.0.keys().cloned().collect::<Vec<String>>().join(", ");
-    let expanded = format!(r#"function run (argMap) {{
-        const {{ {} }} = argMap
-        return ({})
-    }}"#, keys, expression);
-    let expr = JavascriptExpression { transformed: expanded };
-    return Ok(Box::new(expr));
+impl Parser for JavaScriptParser {
+    fn parse(&self, expression: &str, var_context: &VarContext) -> Result<Box<dyn CompiledExpression>, ScenarioError> {
+        let keys = var_context.0.keys().cloned().collect::<Vec<String>>().join(", ");
+        let expanded = format!(r#"function run (argMap) {{
+            const {{ {} }} = argMap
+            return ({})
+        }}"#, keys, expression);
+        let expr = JavascriptExpression { transformed: expanded };
+        return Ok(Box::new(expr));            
+    }
 }
 
 struct JavascriptExpression {
@@ -39,14 +32,18 @@ impl CompiledExpression for JavascriptExpression {
 
 #[test]
 fn test_simple_expression() -> Result<(), ScenarioError> {
-    let expr = parse(&Expression { language: String::from("javascript"), expression: String::from("10 + 5") }, &VarContext(HashMap::new()))?;
+    use std::collections::HashMap;
+    
+    let expr = JavaScriptParser.parse("10 + 5", &VarContext(HashMap::new()))?;
     expr.execute(&InputData(HashMap::new()))?;
     return Ok(());
 }
 
 #[test]
 fn test_expression_with_variable() -> Result<(), ScenarioError> {
-    let expr = parse(&Expression { language: String::from("javascript"), expression: String::from("ala + 5") }, &VarContext(HashMap::from([(String::from("ala"), ())])))?;
+    use std::collections::HashMap;
+
+    let expr = JavaScriptParser.parse("ala + 5", &VarContext(HashMap::from([(String::from("ala"), ())])))?;
     let res = expr.execute(&InputData(HashMap::from([(String::from("ala"), serde_json::to_value(10).unwrap())])));
     assert_eq!(res.unwrap(), serde_json::to_value(15).unwrap());
     return Ok(());    
