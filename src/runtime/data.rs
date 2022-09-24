@@ -1,12 +1,13 @@
 use serde_json::Value;
 use std::{collections::HashMap, rc::Rc};
+use crate::ScenarioError::{ScenarioRuntimeError, ScenarioCompilationError};
 
 #[derive(Clone)]
 pub struct InputData(pub HashMap<String, Rc<VarValue>>);
 
 impl InputData {
     pub fn default_input(value: Value) -> InputData {
-        return InputData(HashMap::from([(String::from("input"), Rc::new(value))]));
+        InputData(HashMap::from([(String::from("input"), Rc::new(value))]))
     }
     pub fn to_serialize(&self) -> HashMap<String, &VarValue> {
         return self.0.iter().map(|f| (f.0.clone(), f.1.as_ref())).collect();
@@ -14,7 +15,7 @@ impl InputData {
     pub fn insert(&self, name: &str, value: Value) -> InputData {
         let mut with_new = self.clone();
         with_new.0.insert(String::from(name), Rc::new(value));
-        return with_new;
+        with_new
     }
 }
 
@@ -22,7 +23,7 @@ pub struct OutputData(pub Vec<VarValue>);
 
 impl OutputData {
     pub fn flatten(vec: Vec<OutputData>) -> OutputData {
-        return OutputData(vec.into_iter().map(|o| o.0).flatten().collect());    
+        OutputData(vec.into_iter().flat_map(|o| o.0).collect())   
     }
 }
 
@@ -46,7 +47,7 @@ impl VarContext {
     pub fn with_var(&self, name: &str) -> VarContext {
         let mut new_ctx = self.clone();
         new_ctx.0.insert(String::from(name), ());
-        return new_ctx;
+        new_ctx
     }
 }
 
@@ -58,7 +59,10 @@ pub enum ScenarioError {
 
 impl std::fmt::Display for ScenarioError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.to_string())
+        write!(f, "{}", match self  {
+            ScenarioCompilationError(str) => str,
+            ScenarioRuntimeError(str) => str 
+        })
     }
 }
 

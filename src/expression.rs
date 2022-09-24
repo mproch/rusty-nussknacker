@@ -23,8 +23,8 @@ pub struct LanguageParser {
 
 impl LanguageParser {
     pub fn parse(&self, expression: &Expression, var_context: &VarContext) -> Result<Box<dyn CompiledExpression>, ScenarioError> {
-        let parser = self.parsers.get(&expression.language).ok_or(ScenarioCompilationError(String::from("Unknown language")))?;
-        return parser.parse(&expression.expression, var_context)
+        let parser = self.parsers.get(&expression.language).ok_or_else(||ScenarioCompilationError(String::from("Unknown language")))?;
+        parser.parse(&expression.expression, var_context)
     }
 
 }
@@ -32,7 +32,7 @@ impl LanguageParser {
 impl Default for LanguageParser {
     fn default() -> LanguageParser {
         let javascript: Box<dyn Parser> = Box::new(JavaScriptParser);
-        return LanguageParser { parsers: HashMap::from([(String::from("javascript"), javascript)]) }
+        LanguageParser { parsers: HashMap::from([(String::from("javascript"), javascript)]) }
     }
 }
 

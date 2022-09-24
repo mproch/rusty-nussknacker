@@ -14,7 +14,7 @@ impl Parser for JavaScriptParser {
             return ({})
         }}"#, keys, expression);
         let expr = JavascriptExpression { transformed: expanded };
-        return Ok(Box::new(expr));            
+        Ok(Box::new(expr))           
     }
 }
 
@@ -26,7 +26,7 @@ impl CompiledExpression for JavascriptExpression {
     fn execute(&self, input_data: &InputData) -> Result<VarValue, ScenarioError> {
         let mut expression = Script::from_string(&self.transformed).map_err(|err| ScenarioRuntimeError(err.to_string()))?;
         let converted = serde_json::to_value(&input_data.to_serialize()).map_err(|err| ScenarioRuntimeError(err.to_string()))?;
-        return expression.call::<Value, Value>("run", &converted).map_err(|err| ScenarioRuntimeError(err.to_string()));    
+        expression.call::<Value, Value>("run", &converted).map_err(|err| ScenarioRuntimeError(err.to_string()))   
     }
 }
 
@@ -37,7 +37,7 @@ fn test_simple_expression() -> Result<(), ScenarioError> {
     
     let expr = JavaScriptParser.parse("10 + 5", &VarContext(HashMap::new()))?;
     expr.execute(&InputData(HashMap::new()))?;
-    return Ok(());
+    Ok(())
 }
 
 #[test]
@@ -48,5 +48,5 @@ fn test_expression_with_variable() -> Result<(), ScenarioError> {
     let expr = JavaScriptParser.parse("ala + 5", &VarContext(HashMap::from([(String::from("ala"), ())])))?;
     let res = expr.execute(&InputData(HashMap::from([(String::from("ala"), Rc::new(serde_json::to_value(10).unwrap()))])));
     assert_eq!(res.unwrap(), serde_json::to_value(15).unwrap());
-    return Ok(());    
+    Ok(())    
 }
