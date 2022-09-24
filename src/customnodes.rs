@@ -5,9 +5,9 @@ use serde_json::Value::{Array, self};
 pub struct ForEach;
 
 impl CustomNodeImpl for ForEach {
-    fn run(&self, output_var: &str, parameters: HashMap<String, VarValue>, data: &mut InputData, next_part: &Box<dyn Interpreter>) -> Result<OutputData, ScenarioError> {
+    fn run(&self, output_var: &str, parameters: HashMap<String, VarValue>, data: &InputData, next_part: &Box<dyn Interpreter>) -> Result<OutputData, ScenarioError> {
         let run = |v: &Value| {
-            data.0.insert(String::from(output_var), v.clone());
+            data.insert(output_var, v.clone());
             return next_part.run(data);    
         };
         match parameters.get("value") {

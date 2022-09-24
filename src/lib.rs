@@ -6,7 +6,6 @@ pub mod customnodes;
 
 use runtime::data::{InputData, OutputData, ScenarioError, ScenarioError::*};
 use serde_json::Value;
-use std::collections::HashMap;
 
 use crate::runtime::compiler::Compiler;
 
@@ -24,8 +23,7 @@ pub fn interpret_scenario(file_name: &str, input_str: &str) -> Result<OutputData
     let runtime = compiler.compile(&scenario)?;
 
     let input: Value = serde_json::from_str(input_str).map_err(map_error_json)?;
-    let input_data: HashMap<String, Value> = HashMap::from([(String::from("input"), input)]);
 
-    return runtime.run(&mut InputData(input_data));
+    return runtime.run(&InputData::default_input(input));
     
 }
