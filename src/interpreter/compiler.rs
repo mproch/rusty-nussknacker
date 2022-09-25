@@ -48,7 +48,7 @@ impl Compiler {
     fn compile_custom_node(&self, output_var: &str, node_type: &str, parameters: &[Parameter], iter: &[Node], var_names: &CompilationVarContext) -> Result<Box<dyn Interpreter>, ScenarioCompilationError> {
         let implementation : &Rc<dyn CustomNodeImpl> = self.custom_nodes.get(node_type).ok_or_else(|| ScenarioCompilationError(String::from("Unknown CustomNode")))?;
     
-        let next_part = self.compile_next(iter, &var_names.with_var(output_var))?;
+        let next_part = self.compile_next(iter, &var_names.with_var(output_var)?)?;
         let compiled_parameters: Result<HashMap<String, Box<dyn CompiledExpression>>, ScenarioCompilationError> = parameters.iter()
             .map(|p| self.compile_parameter(p, var_names)).collect();
         Ok(Box::new(CompiledCustomNode { rest: next_part, output_var: String::from(output_var), 
@@ -62,7 +62,7 @@ impl Compiler {
     
     fn compile_variable(&self, var_name: &str, raw_expression: &Expression, iter: &[Node], var_names: &CompilationVarContext) -> Result<Box<dyn Interpreter>, ScenarioCompilationError> {
         let expression = self.parser.parse(raw_expression, var_names)?;
-        let rest = self.compile_next(iter, &var_names.with_var(var_name))?;
+        let rest = self.compile_next(iter, &var_names.with_var(var_name)?)?;
         let res = CompiledVariable { rest, expression, var_name: String::from(var_name) };
         Ok(Box::new(res))
     }
@@ -192,27 +192,46 @@ impl Interpreter for CompiledSink {
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
-
-    use crate::{scenariomodel::{Node::{Source, Sink, Variable}, Scenario, MetaData, Expression}, interpreter::{compiler::Compiler, data::{VarContext, ScenarioOutput, SingleScenarioOutput}}};
+    use serde_json::json;
+    use serde_json::Value;
+    use crate::{scenariomodel::{Node, Node::{Source, Sink, Variable, Filter}, Scenario, MetaData, Expression}, interpreter::{compiler::Compiler, data::{VarContext, ScenarioOutput, SingleScenarioOutput}}};
 
     fn js(expr: &str) -> Expression {
         Expression { language: String::from("javascript"), expression: String::from(expr) }
     }
 
-    #[test]
-    fn test_variable() {
-        use serde_json::json;
+    fn compile_invoke_to_output(node: Node, input: Value) -> ScenarioOutput {
         let scenario = Scenario { meta_data: MetaData { id: String::from("") }, nodes: vec![
             Source { id: String::from("source")},
-            Variable { id: String::from("var"), var_name: String::from("new_var"), expression: js("12") },
+            node, 
             Sink { id: String::from("sink")}
         ]};
         let compiled_scenario = Compiler::default().compile(&scenario).unwrap();
-        let output = compiled_scenario.run(&VarContext::default_input(json!(22))).unwrap();
-        assert_eq!(output, ScenarioOutput { 0: vec![ 
+        compiled_scenario.run(&VarContext::default_input(input)).unwrap()
+    }
+
+    #[test]
+    fn test_variable() {
+        let node = Variable { id: String::from("var"), var_name: String::from("new_var"), expression: js("12") };
+        let output = compile_invoke_to_output(node, json!(22));
+        assert_eq!(output, ScenarioOutput(vec![ 
             SingleScenarioOutput { node_id: String::from("sink"), variables: 
                 HashMap::from([(String::from("input"), json!(22)), (String::from("new_var"), json!(12))])}
-        ]})
+        ]))
+
+    }
+
+    #[test]
+    fn test_filter() {
+        let node = Filter { id: String::from("filter"), expression: js("input == 22") };
+        let output_true = compile_invoke_to_output(node, json!(22));
+        assert_eq!(output_true, ScenarioOutput(vec![ 
+            SingleScenarioOutput { node_id: String::from("sink"), variables: 
+                HashMap::from([(String::from("input"), json!(22))])}
+        ]));
+        let node = Filter { id: String::from("filter"), expression: js("input == 22") };
+        let output_false = compile_invoke_to_output(node, json!(11));
+        assert_eq!(output_false, ScenarioOutput(vec![]))
 
     }
 }

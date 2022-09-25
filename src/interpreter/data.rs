@@ -1,6 +1,7 @@
 use serde::Serialize;
 use serde_json::Value;
 use std::{collections::HashMap, rc::Rc};
+use regex::Regex;
 
 /// Data passed through scenario
 /// We keep Rc<VarValue> as value in map to avoid excessive cloning. 
@@ -23,7 +24,7 @@ impl VarContext {
 
 ///Output data of the scenario
 ///The data may reach many sinks (e.g. after split) or none (e.g. after filter)
-#[derive(Serialize, PartialEq, Debug)]
+#[derive(Serialize, PartialEq, Eq, Debug)]
 pub struct ScenarioOutput(pub Vec<SingleScenarioOutput>);
 
 impl ScenarioOutput {
@@ -32,7 +33,7 @@ impl ScenarioOutput {
     }
 }
 
-#[derive(Serialize, PartialEq, Debug)]
+#[derive(Serialize, PartialEq, Eq, Debug)]
 pub struct SingleScenarioOutput {
     pub node_id: String,
     pub variables: HashMap<String, VarValue>
@@ -51,11 +52,19 @@ pub type VarType = ();
 #[derive(Clone)]
 pub struct CompilationVarContext(pub HashMap<String, VarType>);
 
+//not sure how to make this thread_local nicer?
+thread_local!(static VAR_PATTERN: Regex = Regex::new("^[a-z][a-z0-9_]*$").unwrap());
+
 impl CompilationVarContext {
-    pub fn with_var(&self, name: &str) -> CompilationVarContext {
+
+
+    pub fn with_var(&self, name: &str) -> Result<CompilationVarContext, ScenarioCompilationError> {
+        if !VAR_PATTERN.with(|r| r.is_match(name)) {
+            return Err(ScenarioCompilationError(format!("Incorrect variable name: {}", name)));
+        }
         let mut new_ctx = self.clone();
         new_ctx.0.insert(String::from(name), ());
-        new_ctx
+        Ok(new_ctx)
     }
 }
 
