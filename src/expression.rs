@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use crate::runtime::data::{VarContext, VarValue, ScenarioCompilationError, ScenarioRuntimeError, CompilationVarContext};
+use crate::interpreter::data::{VarContext, VarValue, ScenarioCompilationError, ScenarioRuntimeError, CompilationVarContext};
 use crate::scenariomodel::Expression;
 use super::javascriptexpression::JavaScriptParser;
 

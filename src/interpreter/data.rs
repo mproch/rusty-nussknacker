@@ -1,10 +1,9 @@
+use serde::Serialize;
 use serde_json::Value;
 use std::{collections::HashMap, rc::Rc};
 
-pub type ScenarioInterpeter = fn(&VarContext) -> Result<ScenarioOutput, ScenarioRuntimeError>;
-
-/// Input data of the scenario
-/// 
+/// Data passed through scenario
+/// We keep Rc<VarValue> as value in map to avoid excessive cloning. 
 #[derive(Clone)]
 pub struct VarContext(pub HashMap<String, Rc<VarValue>>);
 
@@ -12,24 +11,31 @@ impl VarContext {
     pub fn default_input(value: Value) -> VarContext {
         VarContext(HashMap::from([(String::from("input"), Rc::new(value))]))
     }
-    pub fn to_serialize(&self) -> HashMap<String, &VarValue> {
-        return self.0.iter().map(|f| (f.0.clone(), f.1.as_ref())).collect();
+    pub fn to_external_form(&self) -> HashMap<String, VarValue> {
+        return self.0.iter().map(|f| (f.0.clone(), f.1.as_ref().to_owned())).collect();
     }
     pub fn insert(&self, name: &str, value: Value) -> VarContext {
-        let mut with_new = self.clone();
-        with_new.0.insert(String::from(name), Rc::new(value));
-        with_new
+        let mut result = self.clone();
+        result.0.insert(String::from(name), Rc::new(value));
+        result
     }
 }
 
 ///Output data of the scenario
-/// In gn
-pub struct ScenarioOutput(pub Vec<VarValue>);
+///The data may reach many sinks (e.g. after split) or none (e.g. after filter)
+#[derive(Serialize, PartialEq, Debug)]
+pub struct ScenarioOutput(pub Vec<SingleScenarioOutput>);
 
 impl ScenarioOutput {
     pub fn flatten(vec: Vec<ScenarioOutput>) -> ScenarioOutput {
         ScenarioOutput(vec.into_iter().flat_map(|o| o.0).collect())   
     }
+}
+
+#[derive(Serialize, PartialEq, Debug)]
+pub struct SingleScenarioOutput {
+    pub node_id: String,
+    pub variables: HashMap<String, VarValue>
 }
 
 /// 

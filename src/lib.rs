@@ -1,13 +1,13 @@
 pub mod scenariomodel;
-pub mod runtime;
+pub mod interpreter;
 pub mod expression;
 pub mod customnodes;
 mod javascriptexpression;
 
-use runtime::{data::{VarContext, ScenarioOutput, ScenarioCompilationError, ScenarioRuntimeError}, Interpreter};
+use interpreter::{data::{VarContext, ScenarioOutput, ScenarioCompilationError, ScenarioRuntimeError}, Interpreter};
 use serde_json::Value;
 
-use crate::runtime::compiler::Compiler;
+use crate::interpreter::compiler::Compiler;
 
 pub fn create_interpreter(file_name: &str) -> Result<Box<dyn Interpreter>, ScenarioCompilationError> {
 

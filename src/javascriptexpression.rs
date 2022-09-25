@@ -1,5 +1,5 @@
 
-use crate::{runtime::data::{ScenarioCompilationError, ScenarioRuntimeError, VarContext, CompilationVarContext, VarValue}};
+use crate::{interpreter::data::{ScenarioCompilationError, ScenarioRuntimeError, VarContext, CompilationVarContext, VarValue}};
 use super::expression::{CompiledExpression, Parser};
 use js_sandbox::Script;
 use serde_json::Value;
@@ -25,27 +25,34 @@ struct JavascriptExpression {
 impl CompiledExpression for JavascriptExpression {
     fn execute(&self, input_data: &VarContext) -> Result<VarValue, ScenarioRuntimeError> {
         let mut expression = Script::from_string(&self.transformed).map_err(|err| ScenarioRuntimeError(err.to_string()))?;
-        let converted = serde_json::to_value(&input_data.to_serialize()).map_err(|err| ScenarioRuntimeError(err.to_string()))?;
+        let converted = serde_json::to_value(&input_data.to_external_form()).map_err(|err| ScenarioRuntimeError(err.to_string()))?;
         expression.call::<Value, Value>("run", &converted).map_err(|err| ScenarioRuntimeError(err.to_string()))   
     }
 }
 
 
-#[test]
-fn test_simple_expression() {
+#[cfg(test)]
+mod tests {
     use std::collections::HashMap;
-    
-    let expr = JavaScriptParser.parse("10 + 5", &CompilationVarContext(HashMap::new())).unwrap();
-    let res = expr.execute(&VarContext(HashMap::from([])));
-    assert_eq!(res.unwrap(), serde_json::to_value(15).unwrap());
-}
-
-#[test]
-fn test_expression_with_variable() {
-    use std::collections::HashMap;
+    use serde_json::json;
     use std::rc::Rc;
+    use crate::{javascriptexpression::JavaScriptParser, interpreter::data::{CompilationVarContext, VarContext}, expression::Parser};
 
-    let expr = JavaScriptParser.parse("ala + 5", &CompilationVarContext(HashMap::from([(String::from("ala"), ())]))).unwrap();
-    let res = expr.execute(&VarContext(HashMap::from([(String::from("ala"), Rc::new(serde_json::to_value(10).unwrap()))])));
-    assert_eq!(res.unwrap(), serde_json::to_value(15).unwrap());
+    #[test]
+    fn test_simple_expression() {
+        //not quite sure how to import for test properly, without warning
+        
+        let expr = JavaScriptParser.parse("10 + 5", &CompilationVarContext(HashMap::new())).unwrap();
+        let res = expr.execute(&VarContext(HashMap::from([])));
+        assert_eq!(res.unwrap(), json!(15));
+    }
+    
+    #[test]
+    fn test_expression_with_variable() {
+    
+        let expr = JavaScriptParser.parse("ala + 5", &CompilationVarContext(HashMap::from([(String::from("ala"), ())]))).unwrap();
+        let res = expr.execute(&VarContext(HashMap::from([(String::from("ala"), Rc::new(serde_json::to_value(10).unwrap()))])));
+        assert_eq!(res.unwrap(), serde_json::to_value(15).unwrap());
+    }
+    
 }

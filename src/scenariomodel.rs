@@ -1,4 +1,4 @@
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use std::fs;
 use std::io;
 
@@ -12,7 +12,7 @@ pub fn parse(scenario: &str) -> Result<Scenario, io::Error>  {
     Ok(scenario)
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 #[serde(tag = "type")]
 pub enum Node {
     Filter { id: String, expression: Expression },
@@ -32,39 +32,38 @@ pub enum Node {
     Enricher { id: String, output: String, service_ref: ServiceRef }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 pub struct ServiceRef {
     pub id: String,
     pub parameters: Vec<Parameter>
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 pub struct Parameter {
     pub name: String,
     pub expression: Expression
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 pub struct Case {
     pub expression: Expression,
     pub nodes: Vec<Node>
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 pub struct Expression {
     pub language: String,
     pub expression: String
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Scenario {
     pub meta_data: MetaData,
-    pub nodes: Vec<Node>,
-    pub additional_branches: Vec<Vec<Node>>
+    pub nodes: Vec<Node>
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 pub struct MetaData {
     pub id: String
 }

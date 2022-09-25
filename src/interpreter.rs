@@ -12,3 +12,4 @@ pub trait CustomNodeImpl {
 pub trait Interpreter {
     fn run(&self, data: &VarContext) -> Result<ScenarioOutput, ScenarioRuntimeError>;
 }
+

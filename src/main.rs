@@ -1,6 +1,6 @@
 
 use std::{env, io::{self, BufRead}};
-use rusty_nussknacker::{create_interpreter, invoke_interpreter, runtime::Interpreter};
+use rusty_nussknacker::{create_interpreter, invoke_interpreter, interpreter::Interpreter};
 
 fn main() {
     let args: Vec<String> = env::args().collect();

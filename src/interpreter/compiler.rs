@@ -1,6 +1,6 @@
-use crate::{scenariomodel::{Scenario, Node, Node::*, Expression, Case, Parameter}, runtime::data::{ScenarioOutput, VarContext}, expression::{CompiledExpression, LanguageParser}, customnodes::ForEach};
-use serde_json::Value::Bool;
-use super::{data::{ScenarioRuntimeError, ScenarioCompilationError, CompilationVarContext, VarValue}, CustomNodeImpl, Interpreter};
+use crate::{scenariomodel::{Scenario, Node, Node::*, Expression, Case, Parameter}, interpreter::data::{ScenarioOutput, VarContext}, expression::{CompiledExpression, LanguageParser}, customnodes::ForEach};
+use serde_json::{Value::Bool};
+use super::{data::{ScenarioRuntimeError, ScenarioCompilationError, CompilationVarContext, VarValue, SingleScenarioOutput}, CustomNodeImpl, Interpreter};
 use std::{collections::HashMap, rc::Rc};
 
 pub struct Compiler {
@@ -39,7 +39,7 @@ impl Compiler {
             Variable { id: _, var_name, expression } => self.compile_variable(var_name, expression, rest, var_names),
             Switch { id: _, nexts } => self.compile_switch(nexts, var_names),
             Split { id: _, nexts} => self.compile_split(nexts, var_names),
-            Sink { id: _ } => Ok(Box::new(CompiledSink {})),
+            Sink { id } => Ok(Box::new(CompiledSink { node_id: String::from(id) })),
             CustomNode { id: _, output_var, node_type, parameters } => self.compile_custom_node(output_var, node_type, parameters, rest, var_names),
             _ => Err(ScenarioCompilationError("Unknown node".to_string())),
         }
@@ -178,10 +178,41 @@ impl Interpreter for CompiledCustomNode {
     }
 }
 
-struct CompiledSink {}
+struct CompiledSink {
+    node_id: String
+}
 
 impl Interpreter for CompiledSink {
     fn run(&self, data: &VarContext) -> Result<ScenarioOutput, ScenarioRuntimeError> {
-        Ok(ScenarioOutput(vec![serde_json::to_value(data.to_serialize()).unwrap()]))
+        Ok(ScenarioOutput(vec![SingleScenarioOutput{ node_id: String::from(&self.node_id), variables: data.to_external_form() }]))
+    }
+}
+
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+
+    use crate::{scenariomodel::{Node::{Source, Sink, Variable}, Scenario, MetaData, Expression}, interpreter::{compiler::Compiler, data::{VarContext, ScenarioOutput, SingleScenarioOutput}}};
+
+    fn js(expr: &str) -> Expression {
+        Expression { language: String::from("javascript"), expression: String::from(expr) }
+    }
+
+    #[test]
+    fn test_variable() {
+        use serde_json::json;
+        let scenario = Scenario { meta_data: MetaData { id: String::from("") }, nodes: vec![
+            Source { id: String::from("source")},
+            Variable { id: String::from("var"), var_name: String::from("new_var"), expression: js("12") },
+            Sink { id: String::from("sink")}
+        ]};
+        let compiled_scenario = Compiler::default().compile(&scenario).unwrap();
+        let output = compiled_scenario.run(&VarContext::default_input(json!(22))).unwrap();
+        assert_eq!(output, ScenarioOutput { 0: vec![ 
+            SingleScenarioOutput { node_id: String::from("sink"), variables: 
+                HashMap::from([(String::from("input"), json!(22)), (String::from("new_var"), json!(12))])}
+        ]})
+
     }
 }
