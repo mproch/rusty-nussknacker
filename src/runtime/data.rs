@@ -1,49 +1,52 @@
 use serde_json::Value;
 use std::{collections::HashMap, rc::Rc};
 
-#[derive(Clone)]
-pub struct InputData(pub HashMap<String, Rc<VarValue>>);
+pub type ScenarioInterpeter = fn(&VarContext) -> Result<ScenarioOutput, ScenarioRuntimeError>;
 
-impl InputData {
-    pub fn default_input(value: Value) -> InputData {
-        InputData(HashMap::from([(String::from("input"), Rc::new(value))]))
+/// Input data of the scenario
+/// 
+#[derive(Clone)]
+pub struct VarContext(pub HashMap<String, Rc<VarValue>>);
+
+impl VarContext {
+    pub fn default_input(value: Value) -> VarContext {
+        VarContext(HashMap::from([(String::from("input"), Rc::new(value))]))
     }
     pub fn to_serialize(&self) -> HashMap<String, &VarValue> {
         return self.0.iter().map(|f| (f.0.clone(), f.1.as_ref())).collect();
     }
-    pub fn insert(&self, name: &str, value: Value) -> InputData {
+    pub fn insert(&self, name: &str, value: Value) -> VarContext {
         let mut with_new = self.clone();
         with_new.0.insert(String::from(name), Rc::new(value));
         with_new
     }
 }
 
-pub struct OutputData(pub Vec<VarValue>);
+///Output data of the scenario
+/// In gn
+pub struct ScenarioOutput(pub Vec<VarValue>);
 
-impl OutputData {
-    pub fn flatten(vec: Vec<OutputData>) -> OutputData {
-        OutputData(vec.into_iter().flat_map(|o| o.0).collect())   
+impl ScenarioOutput {
+    pub fn flatten(vec: Vec<ScenarioOutput>) -> ScenarioOutput {
+        ScenarioOutput(vec.into_iter().flat_map(|o| o.0).collect())   
     }
 }
 
-/* 
-At the moment we assume JSON model. It's certainly simplification, but for the purpose of this excerise it should be enough;
-*/
+/// 
+/// At the moment we assume JSON model. It's certainly simplification, but for the purpose of this excerise it should be enough;
 pub type VarValue = Value;
-
-pub type ScenarioInterpeter = fn(&InputData) -> Result<OutputData, ScenarioRuntimeError>;
 
 /* 
 We leave possiblity of typing variables, but for now we'll be only interested in variable presence, as it makes
 JS evaluation simpler.
  */
-pub type Type = ();
+pub type VarType = ();
 
 #[derive(Clone)]
-pub struct VarContext(pub HashMap<String, Type>);
+pub struct CompilationVarContext(pub HashMap<String, VarType>);
 
-impl VarContext {
-    pub fn with_var(&self, name: &str) -> VarContext {
+impl CompilationVarContext {
+    pub fn with_var(&self, name: &str) -> CompilationVarContext {
         let mut new_ctx = self.clone();
         new_ctx.0.insert(String::from(name), ());
         new_ctx

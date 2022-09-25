@@ -1,4 +1,16 @@
 use serde::{Deserialize, Serialize};
+use std::fs;
+use std::io;
+
+pub fn parse_file(scenario_filename: &str) -> Result<Scenario, io::Error>  {
+    let scenario_json = fs::read_to_string(scenario_filename)?;
+    parse(&scenario_json)
+}
+
+pub fn parse(scenario: &str) -> Result<Scenario, io::Error>  {
+    let scenario = serde_json::from_str::<Scenario>(scenario)?;
+    Ok(scenario)
+}
 
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "type")]
