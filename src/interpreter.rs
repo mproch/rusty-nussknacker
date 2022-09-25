@@ -1,15 +1,20 @@
 use std::collections::HashMap;
 
-use self::data::{ScenarioRuntimeError, VarValue, ScenarioOutput, VarContext};
+use self::data::{ScenarioOutput, ScenarioRuntimeError, VarContext, VarValue};
 
-pub mod data;
 pub mod compiler;
+pub mod data;
 
 pub trait CustomNodeImpl {
-    fn run(&self, output_var: &str, parameters: HashMap<String, VarValue>, input: &VarContext, next_part: &dyn Interpreter) -> Result<ScenarioOutput, ScenarioRuntimeError>;
+    fn run(
+        &self,
+        output_var: &str,
+        parameters: HashMap<String, VarValue>,
+        input: &VarContext,
+        next_part: &dyn Interpreter,
+    ) -> Result<ScenarioOutput, ScenarioRuntimeError>;
 }
 
 pub trait Interpreter {
     fn run(&self, data: &VarContext) -> Result<ScenarioOutput, ScenarioRuntimeError>;
 }
-
