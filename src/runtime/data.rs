@@ -1,6 +1,5 @@
 use serde_json::Value;
 use std::{collections::HashMap, rc::Rc};
-use crate::ScenarioError::{ScenarioRuntimeError, ScenarioCompilationError};
 
 #[derive(Clone)]
 pub struct InputData(pub HashMap<String, Rc<VarValue>>);
@@ -32,7 +31,7 @@ At the moment we assume JSON model. It's certainly simplification, but for the p
 */
 pub type VarValue = Value;
 
-pub type ScenarioInterpeter = fn(&InputData) -> Result<OutputData, ScenarioError>;
+pub type ScenarioInterpeter = fn(&InputData) -> Result<OutputData, ScenarioRuntimeError>;
 
 /* 
 We leave possiblity of typing variables, but for now we'll be only interested in variable presence, as it makes
@@ -52,18 +51,23 @@ impl VarContext {
 }
 
 #[derive(Debug)]
-pub enum ScenarioError {
-    ScenarioCompilationError(String),
-    ScenarioRuntimeError(String)
-}
+pub struct ScenarioCompilationError(pub String);
 
-impl std::fmt::Display for ScenarioError {
+#[derive(Debug)]
+pub struct ScenarioRuntimeError(pub String);
+
+impl std::fmt::Display for ScenarioCompilationError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", match self  {
-            ScenarioCompilationError(str) => str,
-            ScenarioRuntimeError(str) => str 
-        })
+        write!(f, "{}", self.0)
     }
 }
 
-impl std::error::Error for ScenarioError {}
+impl std::error::Error for ScenarioCompilationError {}
+
+impl std::fmt::Display for ScenarioRuntimeError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl std::error::Error for ScenarioRuntimeError {}

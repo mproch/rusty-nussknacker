@@ -1,6 +1,6 @@
 use crate::{data::jsonmodel::{Scenario, Node, Node::*, Expression, Case, Parameter}, runtime::data::{OutputData, InputData}, expression::{CompiledExpression, LanguageParser}, customnodes::ForEach};
 use serde_json::Value::Bool;
-use super::{data::{ScenarioError::{*, self}, VarContext, VarValue}, CustomNodeImpl};
+use super::{data::{ScenarioRuntimeError, ScenarioCompilationError, VarContext, VarValue}, CustomNodeImpl, Interpreter};
 use std::{collections::HashMap, rc::Rc};
 
 pub struct Compiler {
@@ -18,7 +18,7 @@ impl Default for Compiler {
 impl Compiler {
 
 
-    pub fn compile(&self, scenario: &Scenario) -> Result<Box<dyn Interpreter>, ScenarioError> {
+    pub fn compile(&self, scenario: &Scenario) -> Result<Box<dyn Interpreter>, ScenarioCompilationError> {
         let iter = &scenario.nodes;
         let initial_input = VarContext(HashMap::from([(String::from("input"), ())]));
         return match iter.first() {
@@ -27,7 +27,7 @@ impl Compiler {
         };
     }
     
-    fn compile_next(&self, iter: &[Node], var_names: &VarContext) -> Result<Box<dyn Interpreter>, ScenarioError> {
+    fn compile_next(&self, iter: &[Node], var_names: &VarContext) -> Result<Box<dyn Interpreter>, ScenarioCompilationError> {
         //TODO: handle empty...
         let rest = &iter[1..];
         match iter.first() {
@@ -42,37 +42,37 @@ impl Compiler {
         }
     }
     
-    fn compile_custom_node(&self, output_var: &str, node_type: &str, parameters: &[Parameter], iter: &[Node], var_names: &VarContext) -> Result<Box<dyn Interpreter>, ScenarioError> {
+    fn compile_custom_node(&self, output_var: &str, node_type: &str, parameters: &[Parameter], iter: &[Node], var_names: &VarContext) -> Result<Box<dyn Interpreter>, ScenarioCompilationError> {
         let implementation : &Rc<dyn CustomNodeImpl> = self.custom_nodes.get(node_type).ok_or_else(|| ScenarioCompilationError(String::from("Unknown CustomNode")))?;
     
         let next_part = self.compile_next(iter, &var_names.with_var(output_var))?;
-        let compiled_parameters: Result<HashMap<String, Box<dyn CompiledExpression>>, ScenarioError> = parameters.iter()
+        let compiled_parameters: Result<HashMap<String, Box<dyn CompiledExpression>>, ScenarioCompilationError> = parameters.iter()
             .map(|p| self.compile_parameter(p, var_names)).collect();
         Ok(Box::new(CompiledCustomNode { rest: next_part, output_var: String::from(output_var), 
             params: compiled_parameters?, custom_node: implementation.clone()}))
     }
 
-    fn compile_parameter(&self, parameter: &Parameter, var_names: &VarContext) -> Result<(String, Box<dyn CompiledExpression>), ScenarioError> {
+    fn compile_parameter(&self, parameter: &Parameter, var_names: &VarContext) -> Result<(String, Box<dyn CompiledExpression>), ScenarioCompilationError> {
         let compiled_expression = self.parser.parse(&parameter.expression, var_names)?;
         Ok((parameter.name.clone(), compiled_expression))
     }
     
-    fn compile_variable(&self, var_name: &str, raw_expression: &Expression, iter: &[Node], var_names: &VarContext) -> Result<Box<dyn Interpreter>, ScenarioError> {
+    fn compile_variable(&self, var_name: &str, raw_expression: &Expression, iter: &[Node], var_names: &VarContext) -> Result<Box<dyn Interpreter>, ScenarioCompilationError> {
         let expression = self.parser.parse(raw_expression, var_names)?;
         let rest = self.compile_next(iter, &var_names.with_var(var_name))?;
         let res = CompiledVariable { rest, expression, var_name: String::from(var_name) };
         Ok(Box::new(res))
     }
     
-    fn compile_filter(&self, raw_expression: &Expression, iter: &[Node], var_names: &VarContext) -> Result<Box<dyn Interpreter>, ScenarioError> {
+    fn compile_filter(&self, raw_expression: &Expression, iter: &[Node], var_names: &VarContext) -> Result<Box<dyn Interpreter>, ScenarioCompilationError> {
         let rest = self.compile_next(iter, var_names)?;
         let expression = self.parser.parse(raw_expression, var_names)?;
         let res = CompiledFilter { rest, expression };
         Ok(Box::new(res))
     }
     
-    fn compile_switch(&self, nexts: &[Case], var_names: &VarContext) -> Result<Box<dyn Interpreter>, ScenarioError> {
-        fn parse_case(sself: &Compiler, case: &Case, internal_names: &VarContext) -> Result<CompiledCase, ScenarioError> {
+    fn compile_switch(&self, nexts: &[Case], var_names: &VarContext) -> Result<Box<dyn Interpreter>, ScenarioCompilationError> {
+        fn parse_case(sself: &Compiler, case: &Case, internal_names: &VarContext) -> Result<CompiledCase, ScenarioCompilationError> {
             let rest = sself.compile_next(&case.nodes[..], internal_names)?;
             let expression = sself.parser.parse(&case.expression, internal_names)?;
             Ok(CompiledCase { rest, expression })
@@ -82,15 +82,11 @@ impl Compiler {
         Ok(Box::new(CompiledSwitch { nexts: compiled }))
     }
     
-    fn compile_split(&self, nexts: &[Vec<Node>], var_names: &VarContext) -> Result<Box<dyn Interpreter>, ScenarioError> {
+    fn compile_split(&self, nexts: &[Vec<Node>], var_names: &VarContext) -> Result<Box<dyn Interpreter>, ScenarioCompilationError> {
         let compiled: Vec<Box<dyn Interpreter>> = nexts.iter().map(|n| self.compile_next(&n[..], var_names).unwrap()).collect();
         Ok(Box::new(CompiledSplit { nexts: compiled }))
     }
     
-}
-
-pub trait Interpreter {
-    fn run(&self, data: &InputData) -> Result<OutputData, ScenarioError>;
 }
 
 struct CompiledVariable {
@@ -100,7 +96,7 @@ struct CompiledVariable {
 }
 
 impl Interpreter for CompiledVariable {
-    fn run(&self, data: &InputData) -> Result<OutputData, ScenarioError> {
+    fn run(&self, data: &InputData) -> Result<OutputData, ScenarioRuntimeError> {
         let result = self.expression.execute(data)?;
         let with_var = data.insert(&self.var_name, result);
         self.rest.run(&with_var)
@@ -113,8 +109,8 @@ struct CompiledSplit {
 
 
 impl Interpreter for CompiledSplit {
-    fn run(&self, data: &InputData) -> Result<OutputData, ScenarioError> {
-        let output_result: Result<Vec<OutputData>, ScenarioError> = self.nexts.iter().map(|one| one.run(data)).collect();
+    fn run(&self, data: &InputData) -> Result<OutputData, ScenarioRuntimeError> {
+        let output_result: Result<Vec<OutputData>, ScenarioRuntimeError> = self.nexts.iter().map(|one| one.run(data)).collect();
         output_result.map(OutputData::flatten)
     }
 
@@ -130,8 +126,8 @@ struct CompiledCase {
 }
 
 impl Interpreter for CompiledSwitch {
-    fn run(&self, data: &InputData) -> Result<OutputData, ScenarioError> {
-        let mut result: Result<OutputData, ScenarioError> = Ok(OutputData(vec![]));
+    fn run(&self, data: &InputData) -> Result<OutputData, ScenarioRuntimeError> {
+        let mut result: Result<OutputData, ScenarioRuntimeError> = Ok(OutputData(vec![]));
         for case in &self.nexts  {
             let next_expression = case.expression.execute(data)?;
             let matches = (match next_expression {
@@ -154,7 +150,7 @@ struct CompiledFilter {
 
 
 impl Interpreter for CompiledFilter {
-    fn run(&self, data: &InputData) -> Result<OutputData, ScenarioError> {
+    fn run(&self, data: &InputData) -> Result<OutputData, ScenarioRuntimeError> {
         let result = self.expression.execute(data)?;
         match result {
             Bool(true) => self.rest.run(data),
@@ -172,8 +168,8 @@ struct CompiledCustomNode {
 }
 
 impl Interpreter for CompiledCustomNode {
-    fn run(&self, data: &InputData) -> Result<OutputData, ScenarioError> {
-        let parameters: Result<HashMap<String, VarValue>, ScenarioError> = 
+    fn run(&self, data: &InputData) -> Result<OutputData, ScenarioRuntimeError> {
+        let parameters: Result<HashMap<String, VarValue>, ScenarioRuntimeError> = 
             self.params.iter().map(|e| e.1.execute(data).map(|r| (String::from(e.0), r))).collect();
         self.custom_node.run(&self.output_var, parameters?, data, self.rest.as_ref())   
     }
@@ -182,7 +178,7 @@ impl Interpreter for CompiledCustomNode {
 struct CompiledSink {}
 
 impl Interpreter for CompiledSink {
-    fn run(&self, data: &InputData) -> Result<OutputData, ScenarioError> {
+    fn run(&self, data: &InputData) -> Result<OutputData, ScenarioRuntimeError> {
         Ok(OutputData(vec![serde_json::to_value(data.to_serialize()).unwrap()]))
     }
 }
