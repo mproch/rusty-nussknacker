@@ -164,11 +164,11 @@ impl Compiler {
             let expression = sself.parser.parse(&case.expression, internal_names)?;
             Ok(CompiledCase { rest, expression })
         }
-        let compiled: Vec<CompiledCase> = nexts
+        let compiled: Result<Vec<CompiledCase>, ScenarioCompilationError> = nexts
             .iter()
-            .map(|n| parse_case(self, n, var_names).unwrap())
+            .map(|n| parse_case(self, n, var_names))
             .collect();
-        Ok(Box::new(CompiledSwitch { nexts: compiled }))
+        Ok(Box::new(CompiledSwitch { nexts: compiled? }))
     }
 
     fn compile_split(
@@ -176,11 +176,11 @@ impl Compiler {
         nexts: &[Vec<Node>],
         var_names: &CompilationVarContext,
     ) -> Result<Box<dyn Interpreter>, ScenarioCompilationError> {
-        let compiled: Vec<Box<dyn Interpreter>> = nexts
+        let compiled: Result<Vec<Box<dyn Interpreter>>, ScenarioCompilationError> = nexts
             .iter()
-            .map(|n| self.compile_next(&n[..], var_names).unwrap())
+            .map(|n| self.compile_next(&n[..], var_names))
             .collect();
-        Ok(Box::new(CompiledSplit { nexts: compiled }))
+        Ok(Box::new(CompiledSplit { nexts: compiled? }))
     }
 }
 

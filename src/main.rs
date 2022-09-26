@@ -2,6 +2,7 @@ use rusty_nussknacker::{create_interpreter, interpreter::Interpreter, invoke_int
 use std::{
     env,
     io::{self, BufRead},
+    path::Path,
 };
 
 fn main() {
@@ -9,7 +10,7 @@ fn main() {
     if args.len() < 2 {
         panic!("Incorrect number of arguments: {}", args.len());
     }
-    let interpreter = create_interpreter(&args[1]).unwrap();
+    let interpreter = create_interpreter(Path::new(&args[1])).unwrap();
 
     match args.len() {
         2 => {

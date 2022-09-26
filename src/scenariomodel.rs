@@ -1,8 +1,9 @@
 use serde::Deserialize;
 use std::fs;
 use std::io;
+use std::path::Path;
 
-pub fn parse_file(scenario_filename: &str) -> Result<Scenario, io::Error> {
+pub fn parse_file(scenario_filename: &Path) -> Result<Scenario, io::Error> {
     let scenario_json = fs::read_to_string(scenario_filename)?;
     parse(&scenario_json)
 }

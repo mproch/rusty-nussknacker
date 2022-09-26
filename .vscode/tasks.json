@@ -11,6 +11,16 @@
      }
     },
     {
+      "label": "format",
+      "type": "shell",
+      "command": "cargo fmt",
+      "args": [],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      }
+     },
+    {
         "label": "cargo run with default",
         "type": "shell",
         "command": "cargo",

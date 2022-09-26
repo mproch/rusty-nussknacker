@@ -61,28 +61,24 @@ mod tests {
     use std::rc::Rc;
 
     #[test]
-    fn test_simple_expression() {
-        //not quite sure how to import for test properly, without warning
-
-        let expr = JavaScriptParser
-            .parse("10 + 5", &CompilationVarContext(HashMap::new()))
-            .unwrap();
-        let res = expr.execute(&VarContext(HashMap::from([])));
-        assert_eq!(res.unwrap(), json!(15));
+    fn test_simple_expression() -> Result<(), Box<dyn std::error::Error>> {
+        let expr = JavaScriptParser.parse("10 + 5", &CompilationVarContext(HashMap::new()))?;
+        let res = expr.execute(&VarContext(HashMap::from([])))?;
+        assert_eq!(res, json!(15));
+        Ok(())
     }
 
     #[test]
-    fn test_expression_with_variable() {
-        let expr = JavaScriptParser
-            .parse(
-                "ala + 5",
-                &CompilationVarContext(HashMap::from([(String::from("ala"), ())])),
-            )
-            .unwrap();
+    fn test_expression_with_variable() -> Result<(), Box<dyn std::error::Error>> {
+        let expr = JavaScriptParser.parse(
+            "intval + 5",
+            &CompilationVarContext(HashMap::from([(String::from("intval"), ())])),
+        )?;
         let res = expr.execute(&VarContext(HashMap::from([(
-            String::from("ala"),
-            Rc::new(serde_json::to_value(10).unwrap()),
-        )])));
-        assert_eq!(res.unwrap(), serde_json::to_value(15).unwrap());
+            String::from("intval"),
+            Rc::new(serde_json::to_value(10)?),
+        )])))?;
+        assert_eq!(res, serde_json::to_value(15)?);
+        Ok(())
     }
 }

@@ -1,0 +1,17 @@
+{
+    "metaData": {
+        "id": "Sample"
+    },
+    "nodes": [
+        { "type": "Source", "id": "start"},
+        { "type": "Variable", "id": "var", "varName": "newone", "expression": { "language": "javascript", "expression": "'Message ' + input.field2"}},
+        { "type": "Variable", "id": "array", "varName": "array", "expression": { "language": "javascript", "expression": "['a', 'b', 'c']"}},
+        { "type": "Filter", "id": "filter", "expression": { "language": "javascript", "expression": "true"}},
+        { "type": "CustomNode", "id": "forEach", "outputVar": "each", "nodeType": "forEach", "parameters": [
+            {"name": "value", "expression": { "language": "javascript", "expression": "array"}}
+        ]},
+        { "type": "Sink", "id": "sink"}
+    ],
+    "additionalBranches": []    
+
+}

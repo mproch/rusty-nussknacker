@@ -4,6 +4,8 @@ pub mod interpreter;
 mod javascriptexpression;
 pub mod scenariomodel;
 
+use std::path::Path;
+
 use interpreter::{
     data::{ScenarioCompilationError, ScenarioOutput, ScenarioRuntimeError, VarContext},
     Interpreter,
@@ -13,12 +15,12 @@ use serde_json::Value;
 use crate::interpreter::compiler::Compiler;
 
 pub fn create_interpreter(
-    file_name: &str,
+    scenario_path: &Path,
 ) -> Result<Box<dyn Interpreter>, ScenarioCompilationError> {
     fn map_error(_error: std::io::Error) -> ScenarioCompilationError {
         ScenarioCompilationError(String::from("Failed to read"))
     }
-    let scenario = scenariomodel::parse_file(file_name).map_err(map_error)?;
+    let scenario = scenariomodel::parse_file(scenario_path).map_err(map_error)?;
     let compiler: Compiler = Default::default();
     compiler.compile(&scenario)
 }
