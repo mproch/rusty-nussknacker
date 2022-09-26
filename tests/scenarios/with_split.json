@@ -1,0 +1,19 @@
+{
+    "metaData": {
+        "id": "Sample"
+    },
+    "nodes": [
+        { "type": "Source", "id": "start"},
+        { "type": "Split", "id": "split", "nexts": [
+            [
+                { "id": "nextVar1", "type": "Variable", "varName": "additional", "expression": {"language": "javascript", "expression": "input > 3"}},
+                { "id": "sink1", "type": "Sink" }
+            ],
+            [
+                { "id": "nextVar1", "type": "Variable", "varName": "additional", "expression": {"language": "javascript", "expression": "input < 5"}},
+                { "id": "sink2", "type": "Sink" }
+            ]
+
+        ]}
+    ]
+}

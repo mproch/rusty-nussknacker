@@ -5,16 +5,35 @@ use rusty_nussknacker::create_interpreter;
 use rusty_nussknacker::interpreter::data::VarContext;
 use serde_json::json;
 
-// Change the alias to `Box<error::Error>`.
 type Result<T> = std::result::Result<T, Box<dyn error::Error>>;
 
 #[test]
-fn test_scenario_running() -> Result<()> {
+fn test_scenario_with_custom_node() -> Result<()> {
     let interpreter = create_interpreter(scenario("with_custom.json").as_path())?;
 
     let input = VarContext::default_input(json!(""));
     let output = interpreter.run(&input)?;
+    assert_eq!(
+        output.var_in_sink("sink", "each"),
+        vec![Some(&json!("a")), Some(&json!("b")), Some(&json!("c"))]
+    );
+    Ok(())
+}
 
+#[test]
+fn test_scenario_with_split() -> Result<()> {
+    let interpreter = create_interpreter(scenario("with_split.json").as_path())?;
+
+    let input = VarContext::default_input(json!(4));
+    let output = interpreter.run(&input)?;
+    assert_eq!(
+        output.var_in_sink("sink1", "additional"),
+        vec![Some(&json!(true))]
+    );
+    assert_eq!(
+        output.var_in_sink("sink2", "additional"),
+        vec![Some(&json!(true))]
+    );
     Ok(())
 }
 

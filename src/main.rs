@@ -5,6 +5,8 @@ use std::{
     path::Path,
 };
 
+///This is just an example of how one can use the library. For more production-like usage,
+///the interpreter would be run as a REST server, or a Kafka consumer.  
 fn main() {
     let args: Vec<String> = env::args().collect();
     if args.len() < 2 {

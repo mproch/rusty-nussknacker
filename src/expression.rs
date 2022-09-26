@@ -1,16 +1,19 @@
 use super::javascriptexpression::JavaScriptParser;
 use crate::interpreter::data::{
-    CompilationVarContext, ScenarioCompilationError, ScenarioRuntimeError, VarContext, VarValue,
+    CompilationVarContext, ScenarioCompilationError, ScenarioCompilationError::UnknownLanguage,
+    ScenarioRuntimeError, VarContext, VarValue,
 };
 use crate::scenariomodel::Expression;
 use std::collections::HashMap;
+
+pub trait ParseError: std::error::Error {}
 
 pub trait Parser {
     fn parse(
         &self,
         expression: &str,
         var_context: &CompilationVarContext,
-    ) -> Result<Box<dyn CompiledExpression>, ScenarioCompilationError>;
+    ) -> Result<Box<dyn CompiledExpression>, Box<dyn ParseError>>;
 }
 
 pub trait CompiledExpression {
@@ -30,8 +33,10 @@ impl LanguageParser {
         let parser = self
             .parsers
             .get(&expression.language)
-            .ok_or_else(|| ScenarioCompilationError(String::from("Unknown language")))?;
-        parser.parse(&expression.expression, var_context)
+            .ok_or_else(|| UnknownLanguage(expression.language.to_string()))?;
+        parser
+            .parse(&expression.expression, var_context)
+            .map_err(|err| ScenarioCompilationError::ParseError(err))
     }
 }
 

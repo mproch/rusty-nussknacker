@@ -11,7 +11,5 @@
             {"name": "value", "expression": { "language": "javascript", "expression": "array"}}
         ]},
         { "type": "Sink", "id": "sink"}
-    ],
-    "additionalBranches": []    
-
+    ]
 }

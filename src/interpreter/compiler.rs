@@ -3,7 +3,7 @@ use super::{
         CompilationVarContext, ScenarioCompilationError, ScenarioRuntimeError,
         SingleScenarioOutput, VarValue,
     },
-    CustomNodeImpl, Interpreter,
+    CompilationResult, CustomNodeImpl, Interpreter,
 };
 use crate::{
     customnodes::ForEach,
@@ -14,6 +14,8 @@ use crate::{
 use serde_json::Value::Bool;
 use std::{collections::HashMap, rc::Rc};
 
+///The compiler can be customized with additional language runtimes and additional custom components.
+/// By default, simple javascript language parser and for-each components are provided
 pub struct Compiler {
     custom_nodes: HashMap<String, Rc<dyn CustomNodeImpl>>,
     parser: LanguageParser,
@@ -29,29 +31,30 @@ impl Default for Compiler {
     }
 }
 
+//I'd like to split this code to smaller parts, however my current Rust knowledge doesn't allow me to
+//create sth along the lines of:
+//
+// struct CompilerContext {
+//     node_id: String,
+//     variables: CompilationVarContext,
+//     //in JVM world, I'd have a pointer to compiler::compile_next method, but here I cannot get it working
+//     compile_next: Fn(&[Node], &CompilationVarContext) -> CompilationResult
+// }
+//and then I'd be able to split implementation and tests for each node type
 impl Compiler {
-    pub fn compile(
-        &self,
-        scenario: &Scenario,
-    ) -> Result<Box<dyn Interpreter>, ScenarioCompilationError> {
+    pub fn compile(&self, scenario: &Scenario) -> CompilationResult {
         let iter = &scenario.nodes;
-        let initial_input = CompilationVarContext(HashMap::from([(String::from("input"), ())]));
+        let initial_input = CompilationVarContext::default();
         return match iter.first() {
             Some(Source { id: _ }) => self.compile_next(&iter[1..], &initial_input),
-            _ => Err(ScenarioCompilationError(String::from(
-                "The first node has to be source",
-            ))),
+            _ => Err(ScenarioCompilationError::FirstNodeNotSource()),
         };
     }
 
-    fn compile_next(
-        &self,
-        iter: &[Node],
-        var_names: &CompilationVarContext,
-    ) -> Result<Box<dyn Interpreter>, ScenarioCompilationError> {
+    fn compile_next(&self, iter: &[Node], var_names: &CompilationVarContext) -> CompilationResult {
         match iter.first() {
             Some(first) => self.compile_next_node(first, &iter[1..], var_names),
-            None => Err(ScenarioCompilationError(String::from("Invalid end"))),
+            None => Err(ScenarioCompilationError::InvalidEnd()),
         }
     }
 
@@ -60,7 +63,7 @@ impl Compiler {
         head: &Node,
         rest: &[Node],
         var_names: &CompilationVarContext,
-    ) -> Result<Box<dyn Interpreter>, ScenarioCompilationError> {
+    ) -> CompilationResult {
         match head {
             Filter { id: _, expression } => self.compile_filter(expression, rest, var_names),
             Variable {
@@ -70,16 +73,14 @@ impl Compiler {
             } => self.compile_variable(var_name, expression, rest, var_names),
             Switch { id: _, nexts } => self.compile_switch(nexts, var_names),
             Split { id: _, nexts } => self.compile_split(nexts, var_names),
-            Sink { id } => Ok(Box::new(CompiledSink {
-                node_id: String::from(id),
-            })),
+            Sink { id } => self.compile_sink(id, rest),
             CustomNode {
                 id: _,
                 output_var,
                 node_type,
                 parameters,
             } => self.compile_custom_node(output_var, node_type, parameters, rest, var_names),
-            _ => Err(ScenarioCompilationError("Unknown node".to_string())),
+            _ => Err(ScenarioCompilationError::UnknownNode()),
         }
     }
 
@@ -90,11 +91,11 @@ impl Compiler {
         parameters: &[Parameter],
         iter: &[Node],
         var_names: &CompilationVarContext,
-    ) -> Result<Box<dyn Interpreter>, ScenarioCompilationError> {
+    ) -> CompilationResult {
         let implementation: &Rc<dyn CustomNodeImpl> = self
             .custom_nodes
             .get(node_type)
-            .ok_or_else(|| ScenarioCompilationError(String::from("Unknown CustomNode")))?;
+            .ok_or_else(|| ScenarioCompilationError::UnknownCustomNode(node_type.to_string()))?;
 
         let next_part = self.compile_next(iter, &var_names.with_var(output_var)?)?;
         let compiled_parameters: Result<
@@ -121,13 +122,14 @@ impl Compiler {
         Ok((parameter.name.clone(), compiled_expression))
     }
 
+    //In fact, variable and filter can be implemented as custom nodes
     fn compile_variable(
         &self,
         var_name: &str,
         raw_expression: &Expression,
         iter: &[Node],
         var_names: &CompilationVarContext,
-    ) -> Result<Box<dyn Interpreter>, ScenarioCompilationError> {
+    ) -> CompilationResult {
         let expression = self.parser.parse(raw_expression, var_names)?;
         let rest = self.compile_next(iter, &var_names.with_var(var_name)?)?;
         let res = CompiledVariable {
@@ -143,7 +145,7 @@ impl Compiler {
         raw_expression: &Expression,
         iter: &[Node],
         var_names: &CompilationVarContext,
-    ) -> Result<Box<dyn Interpreter>, ScenarioCompilationError> {
+    ) -> CompilationResult {
         let rest = self.compile_next(iter, var_names)?;
         let expression = self.parser.parse(raw_expression, var_names)?;
         let res = CompiledFilter { rest, expression };
@@ -154,20 +156,14 @@ impl Compiler {
         &self,
         nexts: &[Case],
         var_names: &CompilationVarContext,
-    ) -> Result<Box<dyn Interpreter>, ScenarioCompilationError> {
-        fn parse_case(
-            sself: &Compiler,
-            case: &Case,
-            internal_names: &CompilationVarContext,
-        ) -> Result<CompiledCase, ScenarioCompilationError> {
-            let rest = sself.compile_next(&case.nodes[..], internal_names)?;
-            let expression = sself.parser.parse(&case.expression, internal_names)?;
+    ) -> CompilationResult {
+        let parse_case = |case: &Case| {
+            let rest = self.compile_next(&case.nodes[..], var_names)?;
+            let expression = self.parser.parse(&case.expression, var_names)?;
             Ok(CompiledCase { rest, expression })
-        }
-        let compiled: Result<Vec<CompiledCase>, ScenarioCompilationError> = nexts
-            .iter()
-            .map(|n| parse_case(self, n, var_names))
-            .collect();
+        };
+        let compiled: Result<Vec<CompiledCase>, ScenarioCompilationError> =
+            nexts.iter().map(parse_case).collect();
         Ok(Box::new(CompiledSwitch { nexts: compiled? }))
     }
 
@@ -175,12 +171,22 @@ impl Compiler {
         &self,
         nexts: &[Vec<Node>],
         var_names: &CompilationVarContext,
-    ) -> Result<Box<dyn Interpreter>, ScenarioCompilationError> {
+    ) -> CompilationResult {
         let compiled: Result<Vec<Box<dyn Interpreter>>, ScenarioCompilationError> = nexts
             .iter()
             .map(|n| self.compile_next(&n[..], var_names))
             .collect();
         Ok(Box::new(CompiledSplit { nexts: compiled? }))
+    }
+
+    fn compile_sink(&self, sink_id: &str, rest: &[Node]) -> CompilationResult {
+        if rest.is_empty() {
+            Ok(Box::new(CompiledSink {
+                node_id: String::from(sink_id),
+            }))
+        } else {
+            Err(ScenarioCompilationError::NodesAfterSink(rest.to_vec()))
+        }
     }
 }
 
@@ -205,7 +211,8 @@ struct CompiledSplit {
 impl Interpreter for CompiledSplit {
     fn run(&self, data: &VarContext) -> Result<ScenarioOutput, ScenarioRuntimeError> {
         let output_result: Result<Vec<ScenarioOutput>, ScenarioRuntimeError> =
-            self.nexts.iter().map(|one| one.run(data)).collect();
+        //I'm a bit worried that the compiler does not force this clone...
+            self.nexts.iter().map(|one| one.run(&data.clone())).collect();
         output_result.map(ScenarioOutput::flatten)
     }
 }
@@ -226,7 +233,7 @@ impl Interpreter for CompiledSwitch {
             let next_expression = case.expression.execute(data)?;
             let matches = (match next_expression {
                 Bool(value) => Ok(value),
-                other => Err(ScenarioRuntimeError(format!("Bad switch type: {}", other))),
+                other => Err(ScenarioRuntimeError::InvalidSwitchType(other)),
             })?;
             if matches {
                 result = case.rest.run(data);
@@ -248,7 +255,7 @@ impl Interpreter for CompiledFilter {
         match result {
             Bool(true) => self.rest.run(data),
             Bool(false) => Ok(ScenarioOutput(vec![])),
-            other => Err(ScenarioRuntimeError(format!("Bad error type: {}", other))),
+            other => Err(ScenarioRuntimeError::InvalidSwitchType(other)),
         }
     }
 }
@@ -265,6 +272,7 @@ impl Interpreter for CompiledCustomNode {
         let parameters: Result<HashMap<String, VarValue>, ScenarioRuntimeError> = self
             .params
             .iter()
+            //I was hoping for some nice variant of mapValues...
             .map(|e| e.1.execute(data).map(|r| (String::from(e.0), r)))
             .collect();
         self.custom_node
@@ -286,11 +294,13 @@ impl Interpreter for CompiledSink {
 }
 
 #[cfg(test)]
+//These tests are a too high-level (at least some of them), but I had some technical
+//problems splitting the code above (as I d)
 mod tests {
     use crate::{
         interpreter::{
             compiler::Compiler,
-            data::{ScenarioOutput, SingleScenarioOutput, VarContext},
+            data::{ScenarioOutput, SingleScenarioOutput, VarContext, DEFAULT_INPUT_NAME},
         },
         scenariomodel::{
             Expression, MetaData, Node,
@@ -343,7 +353,7 @@ mod tests {
             ScenarioOutput(vec![SingleScenarioOutput {
                 node_id: String::from("sink"),
                 variables: HashMap::from([
-                    (String::from("input"), json!(22)),
+                    (DEFAULT_INPUT_NAME.to_string(), json!(22)),
                     (String::from("new_var"), json!(12))
                 ])
             }])
@@ -361,7 +371,7 @@ mod tests {
             output_true,
             ScenarioOutput(vec![SingleScenarioOutput {
                 node_id: String::from("sink"),
-                variables: HashMap::from([(String::from("input"), json!(22))])
+                variables: HashMap::from([(DEFAULT_INPUT_NAME.to_string(), json!(22))])
             }])
         );
         let node = Filter {
