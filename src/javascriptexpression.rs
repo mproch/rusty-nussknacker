@@ -30,10 +30,15 @@ impl Parser for JavaScriptParser {
         }}"#,
             keys, expression
         );
-        let expr = JavascriptExpression {
+        //we ignore the result, as we just want to check if expression is correct
+        let _try_to_compile = Script::from_string(&expanded).map_err(|err| {
+            //looks clumsy, but type inference fails here :/
+            let ret: Box<dyn ParseError> = Box::new(JavascriptParseError(err));
+            ret
+        })?;
+        Ok(Box::new(JavascriptExpression {
             transformed: expanded,
-        };
-        Ok(Box::new(expr))
+        }))
     }
 }
 
@@ -41,6 +46,10 @@ struct JavascriptExpression {
     transformed: String,
 }
 
+//This is inefficient implementation, as it parses expression on each invocation. The reason is that
+//call mutates the script. Don't want to figure out how to handle it at the moment.
+//(In JVM in similar cases we had compiled expressions stored in ThreadLocal to deal with concurrency issues, but
+//here the problem is - should CompiledExpression::execute be allowed to mutate the expression??)
 impl CompiledExpression for JavascriptExpression {
     fn execute(&self, input_data: &VarContext) -> Result<VarValue, ScenarioRuntimeError> {
         let mut expression = Script::from_string(&self.transformed)
@@ -50,6 +59,20 @@ impl CompiledExpression for JavascriptExpression {
         expression
             .call::<Value, Value>("run", &converted)
             .map_err(|err| ScenarioRuntimeError::from(JavascriptExecutionError::RuntimeError(err)))
+    }
+}
+
+#[derive(Debug)]
+struct JavascriptParseError(AnyError);
+
+impl Error for JavascriptParseError {}
+
+impl ParseError for JavascriptParseError {}
+
+impl Display for JavascriptParseError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        //this should be nicely handled, just like in ForEachError...
+        write!(f, "Cannot parse: {}", self.0)
     }
 }
 
@@ -69,7 +92,7 @@ impl From<JavascriptExecutionError> for ScenarioRuntimeError {
 impl Display for JavascriptExecutionError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         //this should be nicely handled, just like in ForEachError...
-        write!(f, "TODO...")
+        write!(f, "Error occurred: {:?}", self)
     }
 }
 impl Error for JavascriptExecutionError {}
@@ -82,16 +105,21 @@ mod tests {
         javascriptexpression::JavaScriptParser,
     };
     use serde_json::json;
-    use std::collections::HashMap;
 
     #[test]
     fn test_simple_expression() -> Result<(), Box<dyn std::error::Error>> {
         let expr = JavaScriptParser
-            .parse("10 + 5", &CompilationVarContext(HashMap::new()))
+            .parse("10 + 5", &CompilationVarContext::default())
             .unwrap();
         let res = expr.execute(&VarContext::empty())?;
         assert_eq!(res, json!(15));
         Ok(())
+    }
+
+    #[test]
+    fn test_parse_wrong_expression() {
+        let expr = JavaScriptParser.parse("return aaaa", &CompilationVarContext::default());
+        assert!(expr.is_err());
     }
 
     #[test]
@@ -100,7 +128,23 @@ mod tests {
             .parse("input + 5", &CompilationVarContext::default())
             .unwrap();
         let res = expr.execute(&VarContext::default_input(json!(10)))?;
-        assert_eq!(res, serde_json::to_value(15)?);
+        assert_eq!(res, json!(15));
+        Ok(())
+    }
+
+    #[test]
+    fn test_nested_multiline_expression() -> Result<(), Box<dyn std::error::Error>> {
+        let expr = JavaScriptParser
+            .parse(
+                "[input].map(x => {
+               function add(v1, v2) { return v1 + v2; }
+               return add(x, '+suffix');
+            })[0]",
+                &CompilationVarContext::default(),
+            )
+            .unwrap();
+        let res = expr.execute(&VarContext::default_input(json!("my_input")))?;
+        assert_eq!(res, json!("my_input+suffix"));
         Ok(())
     }
 }

@@ -3,7 +3,7 @@ use serde::Serialize;
 use serde_json::Value;
 use std::{collections::HashMap, rc::Rc};
 
-use crate::scenariomodel::Node;
+use crate::scenariomodel::{Node, NodeId};
 
 /// Data passed through scenario
 /// We keep Rc<VarValue> as value in map to avoid excessive cloning.
@@ -49,7 +49,7 @@ impl ScenarioOutput {
         ScenarioOutput(vec.into_iter().flat_map(|o| o.0).collect())
     }
 
-    pub fn vars_in_sink(&self, sink_id: &str) -> Vec<&HashMap<String, Value>> {
+    pub fn vars_in_sink(&self, sink_id: NodeId) -> Vec<&HashMap<String, Value>> {
         self.0
             .iter()
             .filter(|out| out.node_id == sink_id)
@@ -57,7 +57,7 @@ impl ScenarioOutput {
             .collect()
     }
 
-    pub fn var_in_sink(&self, sink_id: &str, var_name: &str) -> Vec<Option<&Value>> {
+    pub fn var_in_sink(&self, sink_id: NodeId, var_name: &str) -> Vec<Option<&Value>> {
         self.vars_in_sink(sink_id)
             .iter()
             .map(|out| out.get(var_name))
@@ -67,7 +67,7 @@ impl ScenarioOutput {
 
 #[derive(Serialize, PartialEq, Eq, Debug)]
 pub struct SingleScenarioOutput {
-    pub node_id: String,
+    pub node_id: NodeId,
     pub variables: HashMap<String, VarValue>,
 }
 
@@ -104,6 +104,7 @@ impl CompilationVarContext {
 }
 
 #[derive(Debug)]
+//TODO: pass NodeId in all the places...
 pub enum ScenarioCompilationError {
     IncorrectVariableName(String),
     UnknownLanguage(String),
@@ -119,7 +120,7 @@ pub enum ScenarioCompilationError {
 impl std::fmt::Display for ScenarioCompilationError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         //this should be nicely handled, just like in ForEachError...
-        write!(f, "TODO")
+        write!(f, "Error occurred: {:?}", self)
     }
 }
 
@@ -137,7 +138,7 @@ pub enum ScenarioRuntimeError {
 impl std::fmt::Display for ScenarioRuntimeError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         //this should be nicely handled, just like in ForEachError...
-        write!(f, "TODO")
+        write!(f, "Error occurred: {:?}", self)
     }
 }
 

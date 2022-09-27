@@ -1,4 +1,5 @@
 use serde::Deserialize;
+use serde::Serialize;
 use std::fs;
 use std::io;
 use std::path::Path;
@@ -20,31 +21,31 @@ pub fn parse(scenario: &str) -> Result<Scenario, io::Error> {
 ///In particular, joins/unions are not possible
 pub enum Node {
     Filter {
-        id: String,
+        id: NodeId,
         expression: Expression,
     },
     Source {
-        id: String,
+        id: NodeId,
     },
     Switch {
-        id: String,
+        id: NodeId,
         nexts: Vec<Case>,
     },
     Split {
-        id: String,
+        id: NodeId,
         nexts: Vec<Vec<Node>>,
     },
     Sink {
-        id: String,
+        id: NodeId,
     },
     Variable {
-        id: String,
+        id: NodeId,
         #[serde(rename = "varName")]
         var_name: String,
         expression: Expression,
     },
     CustomNode {
-        id: String,
+        id: NodeId,
         #[serde(rename = "outputVar")]
         output_var: String,
         #[serde(rename = "nodeType")]
@@ -53,7 +54,7 @@ pub enum Node {
     },
     //Not implemented at the moment, can be expressed with CustomNode anyway...
     Enricher {
-        id: String,
+        id: NodeId,
         output: String,
         service_ref: ServiceRef,
     },
@@ -81,6 +82,15 @@ pub struct Case {
 pub struct Expression {
     pub language: String,
     pub expression: String,
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
+pub struct NodeId(String);
+
+impl NodeId {
+    pub fn new(id: &str) -> NodeId {
+        NodeId(String::from(id))
+    }
 }
 
 #[derive(Deserialize, Debug, Clone)]

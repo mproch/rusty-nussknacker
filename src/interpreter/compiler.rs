@@ -9,7 +9,7 @@ use crate::{
     customnodes::ForEach,
     expression::{CompiledExpression, LanguageParser},
     interpreter::data::{ScenarioOutput, VarContext},
-    scenariomodel::{Case, Expression, Node, Node::*, Parameter, Scenario},
+    scenariomodel::{Case, Expression, Node, Node::*, NodeId, Parameter, Scenario},
 };
 use serde_json::Value::Bool;
 use std::{collections::HashMap, rc::Rc};
@@ -179,10 +179,10 @@ impl Compiler {
         Ok(Box::new(CompiledSplit { nexts: compiled? }))
     }
 
-    fn compile_sink(&self, sink_id: &str, rest: &[Node]) -> CompilationResult {
+    fn compile_sink(&self, sink_id: &NodeId, rest: &[Node]) -> CompilationResult {
         if rest.is_empty() {
             Ok(Box::new(CompiledSink {
-                node_id: String::from(sink_id),
+                node_id: sink_id.clone(),
             }))
         } else {
             Err(ScenarioCompilationError::NodesAfterSink(rest.to_vec()))
@@ -211,8 +211,7 @@ struct CompiledSplit {
 impl Interpreter for CompiledSplit {
     fn run(&self, data: &VarContext) -> Result<ScenarioOutput, ScenarioRuntimeError> {
         let output_result: Result<Vec<ScenarioOutput>, ScenarioRuntimeError> =
-        //I'm a bit worried that the compiler does not force this clone...
-            self.nexts.iter().map(|one| one.run(&data.clone())).collect();
+            self.nexts.iter().map(|one| one.run(data)).collect();
         output_result.map(ScenarioOutput::flatten)
     }
 }
@@ -281,13 +280,13 @@ impl Interpreter for CompiledCustomNode {
 }
 
 struct CompiledSink {
-    node_id: String,
+    node_id: NodeId,
 }
 
 impl Interpreter for CompiledSink {
     fn run(&self, data: &VarContext) -> Result<ScenarioOutput, ScenarioRuntimeError> {
         Ok(ScenarioOutput(vec![SingleScenarioOutput {
-            node_id: String::from(&self.node_id),
+            node_id: self.node_id.clone(),
             variables: data.to_external_form(),
         }]))
     }
@@ -305,7 +304,7 @@ mod tests {
         scenariomodel::{
             Expression, MetaData, Node,
             Node::{Filter, Sink, Source, Variable},
-            Scenario,
+            NodeId, Scenario,
         },
     };
     use serde_json::json;
@@ -326,11 +325,11 @@ mod tests {
             },
             nodes: vec![
                 Source {
-                    id: String::from("source"),
+                    id: NodeId::new("source"),
                 },
                 node,
                 Sink {
-                    id: String::from("sink"),
+                    id: NodeId::new("sink"),
                 },
             ],
         };
@@ -343,7 +342,7 @@ mod tests {
     #[test]
     fn test_variable() {
         let node = Variable {
-            id: String::from("var"),
+            id: NodeId::new("var"),
             var_name: String::from("new_var"),
             expression: js("12"),
         };
@@ -351,7 +350,7 @@ mod tests {
         assert_eq!(
             output,
             ScenarioOutput(vec![SingleScenarioOutput {
-                node_id: String::from("sink"),
+                node_id: NodeId::new("sink"),
                 variables: HashMap::from([
                     (DEFAULT_INPUT_NAME.to_string(), json!(22)),
                     (String::from("new_var"), json!(12))
@@ -363,19 +362,19 @@ mod tests {
     #[test]
     fn test_filter() {
         let node = Filter {
-            id: String::from("filter"),
+            id: NodeId::new("filter"),
             expression: js("input == 22"),
         };
         let output_true = compile_invoke_to_output(node, json!(22));
         assert_eq!(
             output_true,
             ScenarioOutput(vec![SingleScenarioOutput {
-                node_id: String::from("sink"),
+                node_id: NodeId::new("sink"),
                 variables: HashMap::from([(DEFAULT_INPUT_NAME.to_string(), json!(22))])
             }])
         );
         let node = Filter {
-            id: String::from("filter"),
+            id: NodeId::new("filter"),
             expression: js("input == 22"),
         };
         let output_false = compile_invoke_to_output(node, json!(11));
