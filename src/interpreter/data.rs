@@ -173,12 +173,14 @@ mod tests {
 
     use super::CompilationVarContext;
 
-    const NODE_ID: NodeId = NodeId::new("testNode");
+    fn node_id() -> NodeId {
+        NodeId::new("testNode")
+    }
 
     #[test]
     fn adds_var_to_context() -> Result<(), ScenarioCompilationError> {
         let context = CompilationVarContext::default();
-        let new_ctx = context.with_var(&NODE_ID, "abc")?;
+        let new_ctx = context.with_var(&node_id(), "abc")?;
         assert_eq!(
             new_ctx.0,
             HashMap::from([("input".to_string(), ()), ("abc".to_string(), ())])
@@ -190,11 +192,11 @@ mod tests {
     fn checks_var_name() {
         fn assert_incorrent_name(name: &str) {
             let context = CompilationVarContext::default();
-            match context.with_var(&NODE_ID, name) {
+            match context.with_var(&node_id(), name) {
                 Err(ScenarioCompilationError::IncorrectVariableName {
-                    node_id: NODE_ID,
+                    node_id: id,
                     var_name,
-                }) if name == var_name => (),
+                }) if name == var_name && id == node_id() => (),
                 other => panic!("Unexpected: {:?}", other),
             }
         }

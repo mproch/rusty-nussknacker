@@ -133,27 +133,77 @@ impl CompilationContext<'_> {
 }
 
 #[cfg(test)]
-//These tests are a bit too high-level (at least some of them), but I've figured out how to split compiler only at last time 
+//These tests are a bit too high-level (at least some of them), but I've figured out how to split compiler only at last time
 mod tests {
+    use crate::interpreter::CompilationResult;
+    use crate::{
+        expression::LanguageParser,
+        interpreter::{
+            compiler::CompilationContext,
+            data::{CompilationVarContext, ScenarioRuntimeError},
+            Interpreter,
+        },
+        scenariomodel::{Node, NodeId},
+    };
     use crate::{
         interpreter::{
             compiler::Compiler,
             data::{ScenarioOutput, SingleScenarioOutput, VarContext, DEFAULT_INPUT_NAME},
         },
         scenariomodel::{
-            Expression, MetaData, Node,
+            Expression, MetaData,
             Node::{Filter, Sink, Source, Variable},
-            NodeId, Scenario,
+            Scenario,
         },
     };
     use serde_json::json;
     use serde_json::Value;
     use std::collections::HashMap;
 
-    fn js(expr: &str) -> Expression {
+    pub fn with_stub_context(
+        fun: &dyn Fn(CompilationContext) -> CompilationResult,
+    ) -> CompilationResult {
+        let parser = LanguageParser::default();
+        let var_names = CompilationVarContext::default();
+        let node_id = NodeId::new("test_node");
+        let nodes_to_pass = [Sink {
+            id: output_node_id(),
+        }];
+        let compiler = move |node: &[Node], _var_ctx: &CompilationVarContext| {
+            assert_eq!(nodes_to_pass.clone(), node);
+            let result: Box<dyn Interpreter> = Box::new(Fixed {});
+            Ok(result)
+        };
+        let ctx = CompilationContext {
+            parser: &&parser,
+            compiler: &compiler,
+            var_names: &var_names,
+            rest: &[Sink {
+                id: output_node_id(),
+            }],
+            node_id: &node_id,
+        };
+        fun(ctx)
+    }
+
+    pub fn js(value: &str) -> Expression {
         Expression {
             language: String::from("javascript"),
-            expression: String::from(expr),
+            expression: String::from(value),
+        }
+    }
+
+    pub fn output_node_id() -> NodeId {
+        NodeId::new("OUTPUT")
+    }
+    struct Fixed {}
+
+    impl Interpreter for Fixed {
+        fn run(&self, data: &VarContext) -> Result<ScenarioOutput, ScenarioRuntimeError> {
+            Ok(ScenarioOutput(vec![SingleScenarioOutput {
+                node_id: output_node_id(),
+                variables: data.to_external_form(),
+            }]))
         }
     }
 

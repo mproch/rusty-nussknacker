@@ -38,3 +38,28 @@ impl Interpreter for CompiledVariable {
         self.rest.run(&with_var)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::interpreter::{compiler::tests, data::VarContext};
+    use serde_json::json;
+
+    #[test]
+    fn test_outputs() -> Result<(), Box<dyn std::error::Error>> {
+        let expression = tests::js("input + '-suffix'");
+        let output_name = "test_output";
+        let compiled =
+            tests::with_stub_context(&|ctx| super::compile(ctx, output_name, &expression))?;
+
+        let input = json!("terefere");
+        let output = json!("terefere-suffix");
+
+        let result = compiled.run(&VarContext::default_input(input))?;
+        assert_eq!(
+            result.var_in_sink(tests::output_node_id(), output_name),
+            [Some(&output)]
+        );
+
+        Ok(())
+    }
+}

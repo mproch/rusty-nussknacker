@@ -14,7 +14,7 @@ pub fn parse(scenario: &str) -> Result<Scenario, io::Error> {
     Ok(scenario)
 }
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(tag = "type")]
 ///The structure is the same as in Nussknacker project, as the idea is to run (simple) scenarios in Rust without changes.
 ///The model is a bit simpler, as this is not full-fledged project...
@@ -60,8 +60,8 @@ pub enum Node {
     // },
 }
 
-//
 impl Node {
+    //I'd rather implement it differently (e.g. composition), but wanted to keep original data model
     pub fn id(&self) -> &NodeId {
         match self {
             Node::Filter { id, expression: _ } => id,
@@ -90,19 +90,20 @@ pub struct ServiceRef {
     pub parameters: Vec<Parameter>,
 }
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct Parameter {
     pub name: String,
     pub expression: Expression,
 }
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Deserialize, Debug, Clone, PartialEq, Eq)]
+///Represents one branch of Switch, the expression should evaluate to Boolean value - it's a predicate if branch matches
 pub struct Case {
     pub expression: Expression,
     pub nodes: Vec<Node>,
 }
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct Expression {
     pub language: String,
     pub expression: String,
