@@ -1,17 +1,12 @@
 use super::{
-    data::{
-        CompilationVarContext, ScenarioCompilationError, ScenarioRuntimeError,
-        SingleScenarioOutput, VarValue,
-    },
+    data::{CompilationVarContext, ScenarioCompilationError},
     CompilationResult, CustomNodeImpl, Interpreter,
 };
 use crate::{
     customnodes::ForEach,
-    expression::{CompiledExpression, LanguageParser},
-    interpreter::data::{ScenarioOutput, VarContext},
-    scenariomodel::{Case, Expression, Node, Node::*, NodeId, Parameter, Scenario},
+    expression::LanguageParser,
+    scenariomodel::{Node, Node::*, NodeId, Scenario},
 };
-use serde_json::Value::Bool;
 use std::{collections::HashMap, rc::Rc};
 
 ///The compiler can be customized with additional language runtimes and additional custom components.
@@ -36,13 +31,20 @@ impl Compiler {
         let iter = &scenario.nodes;
         let initial_input = CompilationVarContext::default();
         return match iter.first() {
-            Some(Source { id }) => self.compile_next(id,&iter[1..], &initial_input),
-            Some(other) => Err(ScenarioCompilationError::FirstNodeNotSource(other.id().clone())),
+            Some(Source { id }) => self.compile_next(id, &iter[1..], &initial_input),
+            Some(other) => Err(ScenarioCompilationError::FirstNodeNotSource(
+                other.id().clone(),
+            )),
             None => Err(ScenarioCompilationError::EmptyScenario()),
         };
     }
 
-    fn compile_next(&self, node_id: &NodeId, iter: &[Node], var_names: &CompilationVarContext) -> CompilationResult {
+    fn compile_next(
+        &self,
+        node_id: &NodeId,
+        iter: &[Node],
+        var_names: &CompilationVarContext,
+    ) -> CompilationResult {
         match iter.first() {
             Some(first) => self.compile_next_node(first, &iter[1..], var_names),
             None => Err(ScenarioCompilationError::InvalidEnd(node_id.clone())),
@@ -63,21 +65,21 @@ impl Compiler {
             compiler: &|nds, ctx| self.compile_next(head.id(), nds, ctx),
         };
         match head {
-            Filter { id: _, expression } => CompiledFilter::compile(ctx, expression),
+            Filter { id: _, expression } => filter::compile(ctx, expression),
             Variable {
                 id: _,
                 var_name,
                 expression,
-            } => CompiledVariable::compile(ctx, var_name, expression),
-            Switch { id: _, nexts } => CompiledSwitch::compile(ctx, nexts),
-            Split { id: _, nexts } => CompiledSplit::compile(ctx, nexts),
-            Sink { id } => CompiledSink::compile(ctx, id),
+            } => variable::compile(ctx, var_name, expression),
+            Switch { id: _, nexts } => switch::compile(ctx, nexts),
+            Split { id: _, nexts } => split::compile(ctx, nexts),
+            Sink { id } => sink::compile(ctx, id),
             CustomNode {
                 id,
                 output_var,
                 node_type,
                 parameters,
-            } => CompiledCustomNode::compile(
+            } => customnode::compile(
                 ctx,
                 output_var,
                 parameters,
@@ -89,21 +91,32 @@ impl Compiler {
 
     fn custom_node(
         &self,
-        node_id: &NodeId, 
+        node_id: &NodeId,
         node_type: &str,
     ) -> Result<&Rc<dyn CustomNodeImpl>, ScenarioCompilationError> {
-        self.custom_nodes
-            .get(node_type)
-            .ok_or_else(|| ScenarioCompilationError::UnknownCustomNode { node_id: node_id.clone(), node_type: node_type.to_string() } )
+        self.custom_nodes.get(node_type).ok_or_else(|| {
+            ScenarioCompilationError::UnknownCustomNode {
+                node_id: node_id.clone(),
+                node_type: node_type.to_string(),
+            }
+        })
     }
 }
 
-struct CompilationContext<'a> {
+mod customnode;
+mod filter;
+mod sink;
+mod split;
+mod switch;
+mod variable;
+
+//I was hoping that if child modules are not public, I will be able to make this struct private, but somehow I can't...
+pub struct CompilationContext<'a> {
     parser: &'a LanguageParser,
     compiler: &'a dyn Fn(&[Node], &CompilationVarContext) -> CompilationResult,
     var_names: &'a CompilationVarContext,
     rest: &'a [Node],
-    node_id: &'a NodeId
+    node_id: &'a NodeId,
 }
 
 impl CompilationContext<'_> {
@@ -111,204 +124,16 @@ impl CompilationContext<'_> {
         if self.rest.is_empty() {
             Ok(value)
         } else {
-            Err(ScenarioCompilationError::NodesAfterEndingNode { node_id: self.node_id.clone(), unexpected_nodes: self.rest.to_vec() })
+            Err(ScenarioCompilationError::NodesAfterEndingNode {
+                node_id: self.node_id.clone(),
+                unexpected_nodes: self.rest.to_vec(),
+            })
         }
-    }
-}
-
-struct CompiledVariable {
-    rest: Box<dyn Interpreter>,
-    expression: Box<dyn CompiledExpression>,
-    var_name: String,
-}
-
-impl CompiledVariable {
-    fn compile(
-        ctx: CompilationContext,
-        var_name: &str,
-        raw_expression: &Expression,
-    ) -> Result<Box<dyn Interpreter>, ScenarioCompilationError> {
-        let expression = ctx.parser.parse(ctx.node_id, raw_expression, ctx.var_names)?;
-        let rest = (ctx.compiler)(ctx.rest, &ctx.var_names.with_var(ctx.node_id, var_name)?)?;
-        Ok(Box::new(CompiledVariable {
-            rest,
-            expression,
-            var_name: String::from(var_name),
-        }))
-    }
-}
-
-impl Interpreter for CompiledVariable {
-    fn run(&self, data: &VarContext) -> Result<ScenarioOutput, ScenarioRuntimeError> {
-        let result = self.expression.execute(data)?;
-        let with_var = data.insert(&self.var_name, result);
-        self.rest.run(&with_var)
-    }
-}
-
-struct CompiledSplit {
-    nexts: Vec<Box<dyn Interpreter>>,
-}
-
-impl CompiledSplit {
-    fn compile(ctx: CompilationContext, nexts: &[Vec<Node>]) -> CompilationResult {
-        let compiled: Result<Vec<Box<dyn Interpreter>>, ScenarioCompilationError> = nexts
-            .iter()
-            .map(|n| (ctx.compiler)(&n[..], ctx.var_names))
-            .collect();
-        ctx.assert_end(Box::new(CompiledSplit { nexts: compiled? }))
-    }
-}
-
-impl Interpreter for CompiledSplit {
-    fn run(&self, data: &VarContext) -> Result<ScenarioOutput, ScenarioRuntimeError> {
-        let output_result: Result<Vec<ScenarioOutput>, ScenarioRuntimeError> =
-            self.nexts.iter().map(|one| one.run(data)).collect();
-        output_result.map(ScenarioOutput::flatten)
-    }
-}
-
-struct CompiledSwitch {
-    nexts: Vec<CompiledCase>,
-}
-
-impl CompiledSwitch {
-    fn compile(ctx: CompilationContext, nexts: &[Case]) -> CompilationResult {
-        let parse_case = |case: &Case| {
-            let rest = (ctx.compiler)(&case.nodes[..], ctx.var_names)?;
-            let expression = ctx.parser.parse(ctx.node_id, &case.expression, ctx.var_names)?;
-            Ok(CompiledCase { rest, expression })
-        };
-        let compiled: Result<Vec<CompiledCase>, ScenarioCompilationError> =
-            nexts.iter().map(parse_case).collect();
-        ctx.assert_end(Box::new(CompiledSwitch { nexts: compiled? }))
-    }
-}
-
-struct CompiledCase {
-    rest: Box<dyn Interpreter>,
-    expression: Box<dyn CompiledExpression>,
-}
-
-impl Interpreter for CompiledSwitch {
-    fn run(&self, data: &VarContext) -> Result<ScenarioOutput, ScenarioRuntimeError> {
-        let mut result: Result<ScenarioOutput, ScenarioRuntimeError> = Ok(ScenarioOutput(vec![]));
-        for case in &self.nexts {
-            let next_expression = case.expression.execute(data)?;
-            let matches = (match next_expression {
-                Bool(value) => Ok(value),
-                other => Err(ScenarioRuntimeError::InvalidSwitchType(other)),
-            })?;
-            if matches {
-                result = case.rest.run(data);
-                break;
-            }
-        }
-        result
-    }
-}
-
-struct CompiledFilter {
-    rest: Box<dyn Interpreter>,
-    expression: Box<dyn CompiledExpression>,
-}
-
-impl CompiledFilter {
-    fn compile(ctx: CompilationContext, expression: &Expression) -> CompilationResult {
-        let rest = (ctx.compiler)(ctx.rest, ctx.var_names)?;
-        let expression = ctx.parser.parse(ctx.node_id, expression, ctx.var_names)?;
-        let res = CompiledFilter { rest, expression };
-        Ok(Box::new(res))
-    }
-}
-
-impl Interpreter for CompiledFilter {
-    fn run(&self, data: &VarContext) -> Result<ScenarioOutput, ScenarioRuntimeError> {
-        let result = self.expression.execute(data)?;
-        match result {
-            Bool(true) => self.rest.run(data),
-            Bool(false) => Ok(ScenarioOutput(vec![])),
-            other => Err(ScenarioRuntimeError::InvalidSwitchType(other)),
-        }
-    }
-}
-
-struct CompiledCustomNode {
-    rest: Box<dyn Interpreter>,
-    output_var: String,
-    params: HashMap<String, Box<dyn CompiledExpression>>,
-    custom_node: Rc<dyn CustomNodeImpl>,
-}
-
-impl CompiledCustomNode {
-    fn compile(
-        ctx: CompilationContext,
-        output_var: &str,
-        parameters: &[Parameter],
-        implementation: &Rc<dyn CustomNodeImpl>,
-    ) -> CompilationResult {
-        let next_part = (ctx.compiler)(ctx.rest, &ctx.var_names.with_var(ctx.node_id, output_var)?)?;
-        let compiled_parameters: Result<
-            HashMap<String, Box<dyn CompiledExpression>>,
-            ScenarioCompilationError,
-        > = parameters
-            .iter()
-            .map(|p| CompiledCustomNode::compile_parameter(&ctx, p))
-            .collect();
-        Ok(Box::new(CompiledCustomNode {
-            rest: next_part,
-            output_var: String::from(output_var),
-            params: compiled_parameters?,
-            custom_node: implementation.clone(),
-        }))
-    }
-
-    fn compile_parameter(
-        ctx: &CompilationContext,
-        parameter: &Parameter,
-    ) -> Result<(String, Box<dyn CompiledExpression>), ScenarioCompilationError> {
-        let compiled_expression = ctx.parser.parse(ctx.node_id, &parameter.expression, ctx.var_names)?;
-        Ok((parameter.name.clone(), compiled_expression))
-    }
-}
-
-impl Interpreter for CompiledCustomNode {
-    fn run(&self, data: &VarContext) -> Result<ScenarioOutput, ScenarioRuntimeError> {
-        let parameters: Result<HashMap<String, VarValue>, ScenarioRuntimeError> = self
-            .params
-            .iter()
-            //I was hoping for some nice variant of mapValues...
-            .map(|e| e.1.execute(data).map(|r| (String::from(e.0), r)))
-            .collect();
-        self.custom_node
-            .run(&self.output_var, parameters?, data, self.rest.as_ref())
-    }
-}
-
-struct CompiledSink {
-    node_id: NodeId,
-}
-
-impl CompiledSink {
-    fn compile(ctx: CompilationContext, sink_id: &NodeId) -> CompilationResult {
-        ctx.assert_end(Box::new(CompiledSink {
-            node_id: sink_id.clone(),
-        }))
-    }
-}
-
-impl Interpreter for CompiledSink {
-    fn run(&self, data: &VarContext) -> Result<ScenarioOutput, ScenarioRuntimeError> {
-        Ok(ScenarioOutput(vec![SingleScenarioOutput {
-            node_id: self.node_id.clone(),
-            variables: data.to_external_form(),
-        }]))
     }
 }
 
 #[cfg(test)]
-//These tests are a too high-level (at least some of them), but I had some technical
-//problems splitting the code above, so some of them will have to be added later...
+//These tests are a bit too high-level (at least some of them), but I've figured out how to split compiler only at last time 
 mod tests {
     use crate::{
         interpreter::{
@@ -394,5 +219,4 @@ mod tests {
         let output_false = compile_invoke_to_output(node, json!(11));
         assert_eq!(output_false, ScenarioOutput(vec![]))
     }
-
 }

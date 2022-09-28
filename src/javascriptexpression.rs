@@ -102,7 +102,8 @@ mod tests {
     use crate::{
         expression::Parser,
         interpreter::data::{CompilationVarContext, VarContext},
-        javascriptexpression::JavaScriptParser, scenariomodel::NodeId,
+        javascriptexpression::JavaScriptParser,
+        scenariomodel::NodeId,
     };
     use serde_json::json;
 
@@ -120,7 +121,8 @@ mod tests {
 
     #[test]
     fn test_parse_wrong_expression() {
-        let expr = JavaScriptParser.parse(NODE_ID, "return aaaa", &CompilationVarContext::default());
+        let expr =
+            JavaScriptParser.parse(NODE_ID, "return aaaa", &CompilationVarContext::default());
         assert!(expr.is_err());
     }
 
@@ -137,7 +139,8 @@ mod tests {
     #[test]
     fn test_nested_multiline_expression() -> Result<(), Box<dyn std::error::Error>> {
         let expr = JavaScriptParser
-            .parse(NODE_ID, 
+            .parse(
+                NODE_ID,
                 "[input].map(x => {
                function add(v1, v2) { return v1 + v2; }
                return add(x, '+suffix');

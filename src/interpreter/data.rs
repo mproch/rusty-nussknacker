@@ -91,7 +91,11 @@ impl CompilationVarContext {
         CompilationVarContext(HashMap::from([(DEFAULT_INPUT_NAME.to_string(), ())]))
     }
 
-    pub fn with_var(&self, node_id: &NodeId, name: &str) -> Result<CompilationVarContext, ScenarioCompilationError> {
+    pub fn with_var(
+        &self,
+        node_id: &NodeId,
+        name: &str,
+    ) -> Result<CompilationVarContext, ScenarioCompilationError> {
         if !VAR_PATTERN.with(|r| r.is_match(name)) {
             return Err(ScenarioCompilationError::IncorrectVariableName {
                 node_id: node_id.clone(),
@@ -105,18 +109,32 @@ impl CompilationVarContext {
 }
 
 #[derive(Debug)]
-//TODO: pass NodeId in all the places...
 pub enum ScenarioCompilationError {
-    IncorrectVariableName { node_id: NodeId, var_name: String },
-    UnknownLanguage { node_id: NodeId, language: String },
+    IncorrectVariableName {
+        node_id: NodeId,
+        var_name: String,
+    },
+    UnknownLanguage {
+        node_id: NodeId,
+        language: String,
+    },
     ScenarioReadFailure(std::io::Error),
-    ParseError { node_id: NodeId, error: Box<dyn crate::expression::ParseError> },
+    ParseError {
+        node_id: NodeId,
+        error: Box<dyn crate::expression::ParseError>,
+    },
     InvalidEnd(NodeId),
     FirstNodeNotSource(NodeId),
     UnknownNode(NodeId),
-    UnknownCustomNode{ node_id: NodeId, node_type: String },
-    NodesAfterEndingNode { node_id: NodeId, unexpected_nodes: Vec<Node> },
-    EmptyScenario()
+    UnknownCustomNode {
+        node_id: NodeId,
+        node_type: String,
+    },
+    NodesAfterEndingNode {
+        node_id: NodeId,
+        unexpected_nodes: Vec<Node>,
+    },
+    EmptyScenario(),
 }
 
 impl std::fmt::Display for ScenarioCompilationError {
@@ -173,7 +191,10 @@ mod tests {
         fn assert_incorrent_name(name: &str) {
             let context = CompilationVarContext::default();
             match context.with_var(&NODE_ID, name) {
-                Err(ScenarioCompilationError::IncorrectVariableName { node_id: NODE_ID, var_name }) if name == var_name => (),
+                Err(ScenarioCompilationError::IncorrectVariableName {
+                    node_id: NODE_ID,
+                    var_name,
+                }) if name == var_name => (),
                 other => panic!("Unexpected: {:?}", other),
             }
         }
