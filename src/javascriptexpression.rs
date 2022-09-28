@@ -102,14 +102,16 @@ mod tests {
     use crate::{
         expression::Parser,
         interpreter::data::{CompilationVarContext, VarContext},
-        javascriptexpression::JavaScriptParser,
+        javascriptexpression::JavaScriptParser, scenariomodel::NodeId,
     };
     use serde_json::json;
+
+    const NODE_ID: NodeId = NodeId::new("test");
 
     #[test]
     fn test_simple_expression() -> Result<(), Box<dyn std::error::Error>> {
         let expr = JavaScriptParser
-            .parse("10 + 5", &CompilationVarContext::default())
+            .parse(NODE_ID, "10 + 5", &CompilationVarContext::default())
             .unwrap();
         let res = expr.execute(&VarContext::empty())?;
         assert_eq!(res, json!(15));
@@ -118,14 +120,14 @@ mod tests {
 
     #[test]
     fn test_parse_wrong_expression() {
-        let expr = JavaScriptParser.parse("return aaaa", &CompilationVarContext::default());
+        let expr = JavaScriptParser.parse(NODE_ID, "return aaaa", &CompilationVarContext::default());
         assert!(expr.is_err());
     }
 
     #[test]
     fn test_expression_with_variable() -> Result<(), Box<dyn std::error::Error>> {
         let expr = JavaScriptParser
-            .parse("input + 5", &CompilationVarContext::default())
+            .parse(NODE_ID, "input + 5", &CompilationVarContext::default())
             .unwrap();
         let res = expr.execute(&VarContext::default_input(json!(10)))?;
         assert_eq!(res, json!(15));
@@ -135,7 +137,7 @@ mod tests {
     #[test]
     fn test_nested_multiline_expression() -> Result<(), Box<dyn std::error::Error>> {
         let expr = JavaScriptParser
-            .parse(
+            .parse(NODE_ID, 
                 "[input].map(x => {
                function add(v1, v2) { return v1 + v2; }
                return add(x, '+suffix');

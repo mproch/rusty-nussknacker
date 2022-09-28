@@ -31,37 +31,21 @@ impl Default for Compiler {
     }
 }
 
-struct CompilationContext<'a> {
-    parser: &'a LanguageParser,
-    compiler: &'a dyn Fn(&[Node], &CompilationVarContext) -> CompilationResult,
-    var_names: &'a CompilationVarContext,
-    rest: &'a [Node],
-}
-
-impl CompilationContext<'_> {
-    fn assert_end(&self, value: Box<dyn Interpreter>) -> CompilationResult {
-        if self.rest.is_empty() {
-            Ok(value)
-        } else {
-            Err(ScenarioCompilationError::NodesAfterSink(self.rest.to_vec()))
-        }
-    }
-}
-
 impl Compiler {
     pub fn compile(&self, scenario: &Scenario) -> CompilationResult {
         let iter = &scenario.nodes;
         let initial_input = CompilationVarContext::default();
         return match iter.first() {
-            Some(Source { id: _ }) => self.compile_next(&iter[1..], &initial_input),
-            _ => Err(ScenarioCompilationError::FirstNodeNotSource()),
+            Some(Source { id }) => self.compile_next(id,&iter[1..], &initial_input),
+            Some(other) => Err(ScenarioCompilationError::FirstNodeNotSource(other.id().clone())),
+            None => Err(ScenarioCompilationError::EmptyScenario()),
         };
     }
 
-    fn compile_next(&self, iter: &[Node], var_names: &CompilationVarContext) -> CompilationResult {
+    fn compile_next(&self, node_id: &NodeId, iter: &[Node], var_names: &CompilationVarContext) -> CompilationResult {
         match iter.first() {
             Some(first) => self.compile_next_node(first, &iter[1..], var_names),
-            None => Err(ScenarioCompilationError::InvalidEnd()),
+            None => Err(ScenarioCompilationError::InvalidEnd(node_id.clone())),
         }
     }
 
@@ -75,9 +59,9 @@ impl Compiler {
             parser: &self.parser,
             var_names,
             rest,
-            compiler: &|nds, ctx| self.compile_next(nds, ctx),
+            node_id: head.id(),
+            compiler: &|nds, ctx| self.compile_next(head.id(), nds, ctx),
         };
-
         match head {
             Filter { id: _, expression } => CompiledFilter::compile(ctx, expression),
             Variable {
@@ -89,7 +73,7 @@ impl Compiler {
             Split { id: _, nexts } => CompiledSplit::compile(ctx, nexts),
             Sink { id } => CompiledSink::compile(ctx, id),
             CustomNode {
-                id: _,
+                id,
                 output_var,
                 node_type,
                 parameters,
@@ -97,19 +81,38 @@ impl Compiler {
                 ctx,
                 output_var,
                 parameters,
-                self.custom_node(node_type)?,
+                self.custom_node(id, node_type)?,
             ),
-            _ => Err(ScenarioCompilationError::UnknownNode()),
+            other => Err(ScenarioCompilationError::UnknownNode(other.id().clone())),
         }
     }
 
     fn custom_node(
         &self,
+        node_id: &NodeId, 
         node_type: &str,
     ) -> Result<&Rc<dyn CustomNodeImpl>, ScenarioCompilationError> {
         self.custom_nodes
             .get(node_type)
-            .ok_or_else(|| ScenarioCompilationError::UnknownCustomNode(node_type.to_string()))
+            .ok_or_else(|| ScenarioCompilationError::UnknownCustomNode { node_id: node_id.clone(), node_type: node_type.to_string() } )
+    }
+}
+
+struct CompilationContext<'a> {
+    parser: &'a LanguageParser,
+    compiler: &'a dyn Fn(&[Node], &CompilationVarContext) -> CompilationResult,
+    var_names: &'a CompilationVarContext,
+    rest: &'a [Node],
+    node_id: &'a NodeId
+}
+
+impl CompilationContext<'_> {
+    fn assert_end(&self, value: Box<dyn Interpreter>) -> CompilationResult {
+        if self.rest.is_empty() {
+            Ok(value)
+        } else {
+            Err(ScenarioCompilationError::NodesAfterEndingNode { node_id: self.node_id.clone(), unexpected_nodes: self.rest.to_vec() })
+        }
     }
 }
 
@@ -125,8 +128,8 @@ impl CompiledVariable {
         var_name: &str,
         raw_expression: &Expression,
     ) -> Result<Box<dyn Interpreter>, ScenarioCompilationError> {
-        let expression = ctx.parser.parse(raw_expression, ctx.var_names)?;
-        let rest = (ctx.compiler)(ctx.rest, &ctx.var_names.with_var(var_name)?)?;
+        let expression = ctx.parser.parse(ctx.node_id, raw_expression, ctx.var_names)?;
+        let rest = (ctx.compiler)(ctx.rest, &ctx.var_names.with_var(ctx.node_id, var_name)?)?;
         Ok(Box::new(CompiledVariable {
             rest,
             expression,
@@ -173,7 +176,7 @@ impl CompiledSwitch {
     fn compile(ctx: CompilationContext, nexts: &[Case]) -> CompilationResult {
         let parse_case = |case: &Case| {
             let rest = (ctx.compiler)(&case.nodes[..], ctx.var_names)?;
-            let expression = ctx.parser.parse(&case.expression, ctx.var_names)?;
+            let expression = ctx.parser.parse(ctx.node_id, &case.expression, ctx.var_names)?;
             Ok(CompiledCase { rest, expression })
         };
         let compiled: Result<Vec<CompiledCase>, ScenarioCompilationError> =
@@ -213,7 +216,7 @@ struct CompiledFilter {
 impl CompiledFilter {
     fn compile(ctx: CompilationContext, expression: &Expression) -> CompilationResult {
         let rest = (ctx.compiler)(ctx.rest, ctx.var_names)?;
-        let expression = ctx.parser.parse(expression, ctx.var_names)?;
+        let expression = ctx.parser.parse(ctx.node_id, expression, ctx.var_names)?;
         let res = CompiledFilter { rest, expression };
         Ok(Box::new(res))
     }
@@ -244,7 +247,7 @@ impl CompiledCustomNode {
         parameters: &[Parameter],
         implementation: &Rc<dyn CustomNodeImpl>,
     ) -> CompilationResult {
-        let next_part = (ctx.compiler)(ctx.rest, &ctx.var_names.with_var(output_var)?)?;
+        let next_part = (ctx.compiler)(ctx.rest, &ctx.var_names.with_var(ctx.node_id, output_var)?)?;
         let compiled_parameters: Result<
             HashMap<String, Box<dyn CompiledExpression>>,
             ScenarioCompilationError,
@@ -264,7 +267,7 @@ impl CompiledCustomNode {
         ctx: &CompilationContext,
         parameter: &Parameter,
     ) -> Result<(String, Box<dyn CompiledExpression>), ScenarioCompilationError> {
-        let compiled_expression = ctx.parser.parse(&parameter.expression, ctx.var_names)?;
+        let compiled_expression = ctx.parser.parse(ctx.node_id, &parameter.expression, ctx.var_names)?;
         Ok((parameter.name.clone(), compiled_expression))
     }
 }
@@ -305,7 +308,7 @@ impl Interpreter for CompiledSink {
 
 #[cfg(test)]
 //These tests are a too high-level (at least some of them), but I had some technical
-//problems splitting the code above (as I d)
+//problems splitting the code above, so some of them will have to be added later...
 mod tests {
     use crate::{
         interpreter::{
@@ -391,4 +394,5 @@ mod tests {
         let output_false = compile_invoke_to_output(node, json!(11));
         assert_eq!(output_false, ScenarioOutput(vec![]))
     }
+
 }

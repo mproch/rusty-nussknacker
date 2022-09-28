@@ -53,11 +53,26 @@ pub enum Node {
         parameters: Vec<Parameter>,
     },
     //Not implemented at the moment, can be expressed with CustomNode anyway...
-    Enricher {
-        id: NodeId,
-        output: String,
-        service_ref: ServiceRef,
-    },
+    // Enricher {
+    //     id: NodeId,
+    //     output: String,
+    //     service_ref: ServiceRef,
+    // },
+}
+
+//
+impl Node {
+    pub fn id(&self) -> &NodeId {
+        match self {
+            Node::Filter { id, expression: _ } => id,   
+            Node::Switch { id, nexts: _ } => id,   
+            Node::Split { id, nexts: _ } => id,    
+            Node::Variable { id, var_name: _, expression: _} => id,    
+            Node::CustomNode { id, output_var: _, node_type: _, parameters: _ } => id,    
+            Node::Source { id } => id,   
+            Node::Sink { id } => id,   
+        }
+    }
 }
 
 #[derive(Deserialize, Debug, Clone)]

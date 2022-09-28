@@ -91,11 +91,12 @@ impl CompilationVarContext {
         CompilationVarContext(HashMap::from([(DEFAULT_INPUT_NAME.to_string(), ())]))
     }
 
-    pub fn with_var(&self, name: &str) -> Result<CompilationVarContext, ScenarioCompilationError> {
+    pub fn with_var(&self, node_id: &NodeId, name: &str) -> Result<CompilationVarContext, ScenarioCompilationError> {
         if !VAR_PATTERN.with(|r| r.is_match(name)) {
-            return Err(ScenarioCompilationError::IncorrectVariableName(
-                name.to_string(),
-            ));
+            return Err(ScenarioCompilationError::IncorrectVariableName {
+                node_id: node_id.clone(),
+                var_name: name.to_string(),
+            });
         }
         let mut new_ctx = self.clone();
         new_ctx.0.insert(String::from(name), ());
@@ -106,15 +107,16 @@ impl CompilationVarContext {
 #[derive(Debug)]
 //TODO: pass NodeId in all the places...
 pub enum ScenarioCompilationError {
-    IncorrectVariableName(String),
-    UnknownLanguage(String),
+    IncorrectVariableName { node_id: NodeId, var_name: String },
+    UnknownLanguage { node_id: NodeId, language: String },
     ScenarioReadFailure(std::io::Error),
-    ParseError(Box<dyn crate::expression::ParseError>),
-    InvalidEnd(),
-    FirstNodeNotSource(),
-    UnknownNode(),
-    UnknownCustomNode(String),
-    NodesAfterSink(Vec<Node>),
+    ParseError { node_id: NodeId, error: Box<dyn crate::expression::ParseError> },
+    InvalidEnd(NodeId),
+    FirstNodeNotSource(NodeId),
+    UnknownNode(NodeId),
+    UnknownCustomNode{ node_id: NodeId, node_type: String },
+    NodesAfterEndingNode { node_id: NodeId, unexpected_nodes: Vec<Node> },
+    EmptyScenario()
 }
 
 impl std::fmt::Display for ScenarioCompilationError {
@@ -127,6 +129,7 @@ impl std::fmt::Display for ScenarioCompilationError {
 impl std::error::Error for ScenarioCompilationError {}
 
 #[derive(Debug)]
+//TODO: pass NodeId in runtime errors
 pub enum ScenarioRuntimeError {
     CannotParseInput(serde_json::Error),
     InvalidSwitchType(Value),
@@ -148,14 +151,16 @@ impl std::error::Error for ScenarioRuntimeError {}
 mod tests {
     use std::collections::HashMap;
 
-    use crate::interpreter::data::ScenarioCompilationError;
+    use crate::{interpreter::data::ScenarioCompilationError, scenariomodel::NodeId};
 
     use super::CompilationVarContext;
+
+    const NODE_ID: NodeId = NodeId::new("testNode");
 
     #[test]
     fn adds_var_to_context() -> Result<(), ScenarioCompilationError> {
         let context = CompilationVarContext::default();
-        let new_ctx = context.with_var("abc")?;
+        let new_ctx = context.with_var(&NODE_ID, "abc")?;
         assert_eq!(
             new_ctx.0,
             HashMap::from([("input".to_string(), ()), ("abc".to_string(), ())])
@@ -167,8 +172,8 @@ mod tests {
     fn checks_var_name() {
         fn assert_incorrent_name(name: &str) {
             let context = CompilationVarContext::default();
-            match context.with_var(name) {
-                Err(ScenarioCompilationError::IncorrectVariableName(other)) if name == other => (),
+            match context.with_var(&NODE_ID, name) {
+                Err(ScenarioCompilationError::IncorrectVariableName { node_id: NODE_ID, var_name }) if name == var_name => (),
                 other => panic!("Unexpected: {:?}", other),
             }
         }

@@ -3,7 +3,7 @@ use crate::interpreter::data::{
     CompilationVarContext, ScenarioCompilationError, ScenarioCompilationError::UnknownLanguage,
     ScenarioRuntimeError, VarContext, VarValue,
 };
-use crate::scenariomodel::Expression;
+use crate::scenariomodel::{Expression, NodeId};
 use std::collections::HashMap;
 
 pub trait ParseError: std::error::Error {}
@@ -25,18 +25,19 @@ pub struct LanguageParser {
 }
 
 impl LanguageParser {
-    pub fn parse(
+    pub fn parse (
         &self,
+        node_id: &NodeId, 
         expression: &Expression,
         var_context: &CompilationVarContext,
     ) -> Result<Box<dyn CompiledExpression>, ScenarioCompilationError> {
         let parser = self
             .parsers
             .get(&expression.language)
-            .ok_or_else(|| UnknownLanguage(expression.language.to_string()))?;
+            .ok_or_else(|| UnknownLanguage { node_id: node_id.clone(), language: expression.language.to_string()})?;
         parser
             .parse(&expression.expression, var_context)
-            .map_err(|err| ScenarioCompilationError::ParseError(err))
+            .map_err(|error| ScenarioCompilationError::ParseError { node_id: node_id.clone(), error } )
     }
 }
 
