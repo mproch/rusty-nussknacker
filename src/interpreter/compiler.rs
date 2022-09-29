@@ -160,15 +160,24 @@ mod tests {
     use serde_json::Value;
     use std::collections::HashMap;
 
+    pub fn with_stub_context_single_output(
+        fun: &dyn Fn(CompilationContext) -> CompilationResult,
+    ) -> CompilationResult {
+        with_stub_context(
+            fun,
+            &[Sink {
+                id: output_node_id(),
+            }],
+        )
+    }
+
     pub fn with_stub_context(
         fun: &dyn Fn(CompilationContext) -> CompilationResult,
+        nodes_to_pass: &[Node],
     ) -> CompilationResult {
         let parser = LanguageParser::default();
         let var_names = CompilationVarContext::default();
         let node_id = NodeId::new("test_node");
-        let nodes_to_pass = [Sink {
-            id: output_node_id(),
-        }];
         let compiler = move |node: &[Node], _var_ctx: &CompilationVarContext| {
             assert_eq!(nodes_to_pass.clone(), node);
             let result: Box<dyn Interpreter> = Box::new(Fixed {});

@@ -43,7 +43,8 @@ mod tests {
     #[test]
     fn test_outputs() -> Result<(), Box<dyn std::error::Error>> {
         let expression = tests::js("input>5");
-        let compiled = tests::with_stub_context(&|ctx| super::compile(ctx, &expression))?;
+        let compiled =
+            tests::with_stub_context_single_output(&|ctx| super::compile(ctx, &expression))?;
 
         let result = compiled.run(&VarContext::default_input(json!(3)))?;
         assert_eq!(result.var_in_sink(tests::output_node_id(), "input"), []);

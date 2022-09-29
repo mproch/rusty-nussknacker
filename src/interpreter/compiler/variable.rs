@@ -48,8 +48,9 @@ mod tests {
     fn test_outputs() -> Result<(), Box<dyn std::error::Error>> {
         let expression = tests::js("input + '-suffix'");
         let output_name = "test_output";
-        let compiled =
-            tests::with_stub_context(&|ctx| super::compile(ctx, output_name, &expression))?;
+        let compiled = tests::with_stub_context_single_output(&|ctx| {
+            super::compile(ctx, output_name, &expression)
+        })?;
 
         let input = json!("terefere");
         let output = json!("terefere-suffix");
