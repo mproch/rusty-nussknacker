@@ -36,23 +36,30 @@ impl Interpreter for CompiledFilter {
 mod tests {
     use serde_json::json;
 
-    use crate::interpreter::data::VarContext;
+    use crate::{
+        interpreter::data::{VarContext, DEFAULT_INPUT_NAME},
+        scenariomodel::{Node, NodeId},
+    };
 
     use super::super::tests;
 
     #[test]
     fn test_outputs() -> Result<(), Box<dyn std::error::Error>> {
-        let expression = tests::js("input>5");
-        let compiled =
-            tests::with_stub_context_single_output(&|ctx| super::compile(ctx, &expression))?;
+        let node_to_test = Node::Filter {
+            id: NodeId::new("filter"),
+            expression: tests::js("input>5"),
+        };
+        let sink_id = NodeId::new("sink1");
+
+        let compiled = tests::compile_node(node_to_test, &tests::sink(&sink_id))?;
 
         let result = compiled.run(&VarContext::default_input(json!(3)))?;
-        assert_eq!(result.var_in_sink(tests::output_node_id(), "input"), []);
+        assert_eq!(result.var_in_sink(&sink_id, DEFAULT_INPUT_NAME), []);
 
         let input = json!(8);
         let result = compiled.run(&VarContext::default_input(input.clone()))?;
         assert_eq!(
-            result.var_in_sink(tests::output_node_id(), "input"),
+            result.var_in_sink(&sink_id, DEFAULT_INPUT_NAME),
             [Some(&input)]
         );
 

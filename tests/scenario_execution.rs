@@ -15,7 +15,7 @@ fn test_scenario_with_custom_node() -> Result<()> {
     let input = VarContext::default_input(json!(""));
     let output = interpreter.run(&input)?;
     assert_eq!(
-        output.var_in_sink(NodeId::new("sink"), "each"),
+        output.var_in_sink(&NodeId::new("sink"), "each"),
         vec![Some(&json!("a")), Some(&json!("b")), Some(&json!("c"))]
     );
     Ok(())
@@ -28,11 +28,11 @@ fn test_scenario_with_split() -> Result<()> {
     let input = VarContext::default_input(json!(4));
     let output = interpreter.run(&input)?;
     assert_eq!(
-        output.var_in_sink(NodeId::new("sink1"), "additional"),
+        output.var_in_sink(&NodeId::new("sink1"), "additional"),
         vec![Some(&json!(true))]
     );
     assert_eq!(
-        output.var_in_sink(NodeId::new("sink2"), "additional"),
+        output.var_in_sink(&NodeId::new("sink2"), "additional"),
         vec![Some(&json!(true))]
     );
     Ok(())

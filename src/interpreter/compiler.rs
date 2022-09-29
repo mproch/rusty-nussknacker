@@ -135,16 +135,6 @@ impl CompilationContext<'_> {
 #[cfg(test)]
 //These tests are a bit too high-level (at least some of them), but I've figured out how to split compiler only at last time
 mod tests {
-    use crate::interpreter::CompilationResult;
-    use crate::{
-        expression::LanguageParser,
-        interpreter::{
-            compiler::CompilationContext,
-            data::{CompilationVarContext, ScenarioRuntimeError},
-            Interpreter,
-        },
-        scenariomodel::{Node, NodeId},
-    };
     use crate::{
         interpreter::{
             compiler::Compiler,
@@ -156,43 +146,17 @@ mod tests {
             Scenario,
         },
     };
+    use crate::{
+        interpreter::{data::CompilationVarContext, CompilationResult},
+        scenariomodel::{Node, NodeId},
+    };
     use serde_json::json;
     use serde_json::Value;
     use std::collections::HashMap;
 
-    pub fn with_stub_context_single_output(
-        fun: &dyn Fn(CompilationContext) -> CompilationResult,
-    ) -> CompilationResult {
-        with_stub_context(
-            fun,
-            &[Sink {
-                id: output_node_id(),
-            }],
-        )
-    }
-
-    pub fn with_stub_context(
-        fun: &dyn Fn(CompilationContext) -> CompilationResult,
-        nodes_to_pass: &[Node],
-    ) -> CompilationResult {
-        let parser = LanguageParser::default();
-        let var_names = CompilationVarContext::default();
-        let node_id = NodeId::new("test_node");
-        let compiler = move |node: &[Node], _var_ctx: &CompilationVarContext| {
-            assert_eq!(nodes_to_pass.clone(), node);
-            let result: Box<dyn Interpreter> = Box::new(Fixed {});
-            Ok(result)
-        };
-        let ctx = CompilationContext {
-            parser: &&parser,
-            compiler: &compiler,
-            var_names: &var_names,
-            rest: &[Sink {
-                id: output_node_id(),
-            }],
-            node_id: &node_id,
-        };
-        fun(ctx)
+    pub fn compile_node(node: Node, rest: &[Node]) -> CompilationResult {
+        let var_ctx = CompilationVarContext::default();
+        Compiler::default().compile_next_node(&node, rest, &var_ctx)
     }
 
     pub fn js(value: &str) -> Expression {
@@ -202,18 +166,8 @@ mod tests {
         }
     }
 
-    pub fn output_node_id() -> NodeId {
-        NodeId::new("OUTPUT")
-    }
-    struct Fixed {}
-
-    impl Interpreter for Fixed {
-        fn run(&self, data: &VarContext) -> Result<ScenarioOutput, ScenarioRuntimeError> {
-            Ok(ScenarioOutput(vec![SingleScenarioOutput {
-                node_id: output_node_id(),
-                variables: data.to_external_form(),
-            }]))
-        }
+    pub fn sink(id: &NodeId) -> Vec<Node> {
+        vec![{ Node::Sink { id: id.clone() } }]
     }
 
     fn compile_invoke_to_output(node: Node, input: Value) -> ScenarioOutput {

@@ -53,37 +53,50 @@ impl Interpreter for CompiledSwitch {
 mod tests {
     use serde_json::json;
 
-    use crate::{interpreter::data::VarContext, scenariomodel::{Node, NodeId, Case}};
+    use crate::{
+        interpreter::data::{VarContext, DEFAULT_INPUT_NAME},
+        scenariomodel::{Case, Node, NodeId},
+    };
 
     use super::super::tests;
 
     #[test]
     fn test_outputs() -> Result<(), Box<dyn std::error::Error>> {
-        
-        let rest1 = vec![Node::Sink { id: NodeId::new("sink1") }];
-        let case1 = Case { expression: tests::js("input > 0"), nodes: rest1.clone() };
-        let rest2 = vec![Node::Sink { id: NodeId::new("sink1") }];
-        let case2 = Case { expression: tests::js("input <= 0"), nodes: rest2.clone() };
-        let cases = &[case1.clone(), case2.clone()];
+        let left_sink_id = NodeId::new("sink1");
+        let right_sink_id = NodeId::new("sink2");
 
-        let compiled =
-            tests::with_stub_context(&|ctx| super::compile(ctx, cases), &rest1.clone())?;
+        let left_case = Case {
+            expression: tests::js("input > 0"),
+            nodes: tests::sink(&left_sink_id),
+        };
+        let right_case = Case {
+            expression: tests::js("input <= 0"),
+            nodes: tests::sink(&right_sink_id),
+        };
+
+        let compiled = tests::compile_node(
+            Node::Switch {
+                id: NodeId::new("node_id"),
+                nexts: vec![left_case, right_case],
+            },
+            &[],
+        )?;
+
         let input = json!(8);
         let result = compiled.run(&VarContext::default_input(input.clone()))?;
         assert_eq!(
-            result.var_in_sink(tests::output_node_id(), "input"),
+            result.var_in_sink(&left_sink_id, DEFAULT_INPUT_NAME),
             [Some(&input)]
         );
+        assert_eq!(result.var_in_sink(&right_sink_id, DEFAULT_INPUT_NAME), []);
 
-        let compiled =
-            tests::with_stub_context(&|ctx| super::compile(ctx, cases), &rest2.clone())?;
-        let input = json!(-4);
+        let input = json!(-5);
         let result = compiled.run(&VarContext::default_input(input.clone()))?;
+        assert_eq!(result.var_in_sink(&left_sink_id, DEFAULT_INPUT_NAME), []);
         assert_eq!(
-            result.var_in_sink(tests::output_node_id(), "input"),
+            result.var_in_sink(&right_sink_id, DEFAULT_INPUT_NAME),
             [Some(&input)]
         );
-
 
         Ok(())
     }

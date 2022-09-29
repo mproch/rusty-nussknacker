@@ -41,25 +41,29 @@ impl Interpreter for CompiledVariable {
 
 #[cfg(test)]
 mod tests {
-    use crate::interpreter::{compiler::tests, data::VarContext};
+    use crate::{
+        interpreter::{compiler::tests, data::VarContext},
+        scenariomodel::{Node, NodeId},
+    };
     use serde_json::json;
 
     #[test]
     fn test_outputs() -> Result<(), Box<dyn std::error::Error>> {
-        let expression = tests::js("input + '-suffix'");
         let output_name = "test_output";
-        let compiled = tests::with_stub_context_single_output(&|ctx| {
-            super::compile(ctx, output_name, &expression)
-        })?;
+        let node_to_test = Node::Variable {
+            id: NodeId::new("filter"),
+            var_name: output_name.to_string(),
+            expression: tests::js("input + '-suffix'"),
+        };
+        let sink_id = NodeId::new("sink1");
+
+        let compiled = tests::compile_node(node_to_test, &tests::sink(&sink_id))?;
 
         let input = json!("terefere");
         let output = json!("terefere-suffix");
 
         let result = compiled.run(&VarContext::default_input(input))?;
-        assert_eq!(
-            result.var_in_sink(tests::output_node_id(), output_name),
-            [Some(&output)]
-        );
+        assert_eq!(result.var_in_sink(&sink_id, output_name), [Some(&output)]);
 
         Ok(())
     }

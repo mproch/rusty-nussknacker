@@ -49,15 +49,15 @@ impl ScenarioOutput {
         ScenarioOutput(vec.into_iter().flat_map(|o| o.0).collect())
     }
 
-    pub fn vars_in_sink(&self, sink_id: NodeId) -> Vec<&HashMap<String, Value>> {
+    pub fn vars_in_sink(&self, sink_id: &NodeId) -> Vec<&HashMap<String, Value>> {
         self.0
             .iter()
-            .filter(|out| out.node_id == sink_id)
+            .filter(|out| out.node_id == *sink_id)
             .map(|out| &out.variables)
             .collect()
     }
 
-    pub fn var_in_sink(&self, sink_id: NodeId, var_name: &str) -> Vec<Option<&Value>> {
+    pub fn var_in_sink(&self, sink_id: &NodeId, var_name: &str) -> Vec<Option<&Value>> {
         self.vars_in_sink(sink_id)
             .iter()
             .map(|out| out.get(var_name))
