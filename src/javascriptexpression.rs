@@ -10,6 +10,8 @@ use serde_json::Value;
 
 pub struct JavaScriptParser;
 
+///Essentially we wrap given expression in a function, that takes one argument (as it's required by js-sandbox crate), and destructures in
+///as we assume that the argument is an object composed of all variables available
 impl Parser for JavaScriptParser {
     fn parse(
         &self,

@@ -147,7 +147,7 @@ impl std::fmt::Display for ScenarioCompilationError {
 impl std::error::Error for ScenarioCompilationError {}
 
 #[derive(Debug)]
-//TODO: pass NodeId in runtime errors
+//TODO: pass NodeId in runtime errors, like in compilation errors
 pub enum ScenarioRuntimeError {
     CannotParseInput(serde_json::Error),
     InvalidSwitchType(Value),
