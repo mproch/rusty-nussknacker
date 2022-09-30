@@ -20,6 +20,7 @@ pub fn parse(scenario: &str) -> Result<Scenario, io::Error> {
 ///The model is a bit simpler, as this is not full-fledged project...
 ///In particular, joins/unions are not possible
 pub enum Node {
+    ///https://nussknacker.io/documentation/docs/scenarios_authoring/BasicNodes#filter - we skip 'false' branch for simplification
     Filter {
         id: NodeId,
         expression: Expression,
@@ -27,10 +28,12 @@ pub enum Node {
     Source {
         id: NodeId,
     },
+    ///https://nussknacker.io/documentation/docs/scenarios_authoring/BasicNodes#choice
     Switch {
         id: NodeId,
         nexts: Vec<Case>,
     },
+    ///https://nussknacker.io/documentation/docs/scenarios_authoring/BasicNodes#split
     Split {
         id: NodeId,
         nexts: Vec<Vec<Node>>,
@@ -38,6 +41,7 @@ pub enum Node {
     Sink {
         id: NodeId,
     },
+    ///https://nussknacker.io/documentation/docs/scenarios_authoring/BasicNodes#variable
     Variable {
         id: NodeId,
         #[serde(rename = "varName")]
