@@ -13,12 +13,14 @@ can serve as a base for such a service, and a simplistic console app, which read
 At the moment, Javascript expressions and a simple for-each custom component is provided. I hope it will be possible to load other stuff
 e.g. with dlopen.
 
-Some of the things that are ommitted (due to lack of time, the fact that it's my first Rust project etc.):
-- Detailed validation messages
-- Invocations are synchronous
-- Handling Javascript expressions is certainly not optimal and a bit hacky.
+Now, this is my first Rust project, so for sure there places where it smells Scala/JVM. Some of the things I'm sure can be improved:
+- Errors using some crate that would reduce the boilerplate
+- Constants with lazy_static
 - Restrict pub usage in modules and fields
+- Tests for more error paths
 
 There are also more things I'd like to work on:
+- Asynchronous invocations are synchronous
 - Typing of variables
+- Handling Javascript expressions is certainly not optimal and a bit hacky.
 - Join nodes (e.g. unions), custom sinks and sources are not supported

@@ -25,7 +25,7 @@ pub trait CustomNodeImpl {
     fn run(
         &self,
         output_var: &str,
-        parameters: HashMap<String, VarValue>,
+        parameters: &HashMap<String, VarValue>,
         input: &VarContext,
         next_part: &dyn Interpreter,
     ) -> Result<ScenarioOutput, ScenarioRuntimeError>;

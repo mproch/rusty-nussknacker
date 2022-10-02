@@ -61,6 +61,6 @@ impl Interpreter for CompiledCustomNode {
             .map(|e| e.1.execute(data).map(|r| (String::from(e.0), r)))
             .collect();
         self.custom_node
-            .run(&self.output_var, parameters?, data, self.rest.as_ref())
+            .run(&self.output_var, &parameters?, data, self.rest.as_ref())
     }
 }

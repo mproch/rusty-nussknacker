@@ -15,7 +15,7 @@ impl CustomNodeImpl for ForEach {
     fn run(
         &self,
         output_var: &str,
-        parameters: HashMap<String, VarValue>,
+        parameters: &HashMap<String, VarValue>,
         data: &VarContext,
         next_part: &dyn Interpreter,
     ) -> Result<ScenarioOutput, ScenarioRuntimeError> {
@@ -37,7 +37,7 @@ impl CustomNodeImpl for ForEach {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum ForEachError {
     WrongValueType(Value),
     NoValueParam,
@@ -60,3 +60,88 @@ impl Display for ForEachError {
     }
 }
 impl Error for ForEachError {}
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        customnodes::ForEachError,
+        interpreter::{
+            data::{
+                ScenarioOutput, ScenarioRuntimeError, SingleScenarioOutput, VarContext, VarValue,
+            },
+            CustomNodeImpl, Interpreter,
+        },
+        scenariomodel::NodeId,
+    };
+    use serde_json::{json, Value};
+    use std::collections::HashMap;
+
+    use super::{ForEach, VALUE_PARAM};
+
+    const TEST_OUTPUT: &str = "test_output";
+
+    struct MockInterpreter {}
+
+    impl Interpreter for MockInterpreter {
+        fn run(&self, data: &VarContext) -> Result<ScenarioOutput, ScenarioRuntimeError> {
+            Ok(ScenarioOutput(vec![SingleScenarioOutput {
+                node_id: NodeId::new(TEST_OUTPUT),
+                variables: data.to_external_form(),
+            }]))
+        }
+    }
+
+    #[test]
+    fn test_arrays() -> Result<(), ScenarioRuntimeError> {
+        let foreach = ForEach {};
+        let output_var = "output";
+        let next_part = MockInterpreter {};
+
+        let check_for_value = |v: &[&VarValue]| -> Result<(), ScenarioRuntimeError> {
+            let parameters = HashMap::from([(VALUE_PARAM.to_owned(), json!(v))]);
+            let result = foreach.run(output_var, &parameters, &VarContext::empty(), &next_part)?;
+            let values: Vec<&VarValue> = result
+                .var_in_sink(&NodeId::new(TEST_OUTPUT), output_var)
+                .iter()
+                .map(|o| o.unwrap())
+                .collect();
+            assert_eq!(values, v);
+            Ok(())
+        };
+        check_for_value(&[&json!("a"), &json!(12)])?;
+        check_for_value(&[])?;
+        check_for_value(&[&json!(""), &Value::Null])?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_wrong_parameters() {
+        let foreach = ForEach {};
+        let next_part = MockInterpreter {};
+        let output_var = "output";
+
+        let test_parameter = |params: &HashMap<String, VarValue>, expected_error: ForEachError| {
+            let result = foreach
+                .run(output_var, params, &VarContext::empty(), &next_part)
+                .unwrap_err();
+            let error = match result {
+                ScenarioRuntimeError::CustomNodeError(error) => {
+                    error.downcast::<ForEachError>().unwrap()
+                }
+                other => panic!("Unexpected error {:?}", other),
+            };
+            assert_eq!(*error, expected_error);
+        };
+        test_parameter(&HashMap::from([]), ForEachError::NoValueParam);
+        test_parameter(
+            &HashMap::from([(String::from("dummy_name"), json!([]))]),
+            ForEachError::NoValueParam,
+        );
+
+        test_parameter(
+            &HashMap::from([(String::from(VALUE_PARAM), json!(""))]),
+            ForEachError::WrongValueType(json!("")),
+        );
+    }
+}
