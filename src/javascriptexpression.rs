@@ -1,4 +1,4 @@
-use std::{error::Error, fmt::Display};
+use std::{cell::RefCell, collections::HashMap, error::Error, fmt::Display};
 
 use super::expression::{CompiledExpression, Parser};
 use crate::{
@@ -7,6 +7,20 @@ use crate::{
 };
 use js_sandbox::{AnyError, Script};
 use serde_json::Value;
+
+/*
+I use global state to cache compiled scripts. This is not what I'd like to do, but:
+- Script.call mutates self.
+- I don't want to make all the expression/scenario API mutable - it shouldn't be this way.
+- I couldn't find any way to invoke Script (or any other library to invoke JS expressions) without mutating it. This is reasonable,
+  because in general JS expressions can mutate global state of JS Runtime... Hopefuly in the future it will be possible with FrozenRealms or sth
+  like that. Currently, the implementation is "unsafe" - one write `Object.global = input` and pass the state to next invocation on a given thread...
+
+Other way to solve this is to parse Script on each invocation, but it's hopelessly inefficient then.
+*/
+thread_local! {
+    static CACHED_SCRIPTS: RefCell<HashMap<String,Script>>  = RefCell::new(HashMap::from([]));
+}
 
 pub struct JavaScriptParser;
 
@@ -33,7 +47,7 @@ impl Parser for JavaScriptParser {
             keys, expression
         );
         //we ignore the result, as we just want to check if expression is correct
-        let _try_to_compile = Script::from_string(&expanded).map_err(|err| {
+        let _compiled = Script::from_string(&expanded).map_err(|err| {
             //looks clumsy, but type inference fails here :/
             let ret: Box<dyn ParseError> = Box::new(JavascriptParseError(err));
             ret
@@ -48,19 +62,32 @@ struct JavascriptExpression {
     transformed: String,
 }
 
-//This is inefficient implementation, as it parses expression on each invocation. The reason is that
-//call mutates the script. Don't want to figure out how to handle it at the moment.
-//(In JVM in similar cases we had compiled expressions stored in ThreadLocal to deal with concurrency issues, but
-//here the problem is - should CompiledExpression::execute be allowed to mutate the expression??)
-impl CompiledExpression for JavascriptExpression {
-    fn execute(&self, input_data: &VarContext) -> Result<VarValue, ScenarioRuntimeError> {
-        let mut expression = Script::from_string(&self.transformed)
-            .map_err(JavascriptExecutionError::ScriptParse)?;
+impl JavascriptExpression {
+    fn execute_script(
+        script: &mut Script,
+        input_data: &VarContext,
+    ) -> Result<VarValue, ScenarioRuntimeError> {
         let converted = serde_json::to_value(&input_data.to_external_form())
             .map_err(JavascriptExecutionError::InputParse)?;
-        expression
+        script
             .call::<(Value,), Value>("run", (converted,))
             .map_err(|err| ScenarioRuntimeError::from(JavascriptExecutionError::RuntimeError(err)))
+    }
+}
+
+impl CompiledExpression for JavascriptExpression {
+    fn execute(&self, input_data: &VarContext) -> Result<VarValue, ScenarioRuntimeError> {
+        CACHED_SCRIPTS.with(|c| {
+            let mut map = c.borrow_mut();
+            if !map.contains_key(&self.transformed) {
+                let expression = Script::from_string(&self.transformed)
+                    .map_err(JavascriptExecutionError::ScriptParse)?;
+                map.insert(self.transformed.clone(), expression);
+            }
+            //we are sure the key is present
+            let expression = map.get_mut(&self.transformed).unwrap();
+            JavascriptExpression::execute_script(expression, input_data)
+        })
     }
 }
 
