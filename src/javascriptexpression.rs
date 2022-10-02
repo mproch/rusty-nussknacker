@@ -59,7 +59,7 @@ impl CompiledExpression for JavascriptExpression {
         let converted = serde_json::to_value(&input_data.to_external_form())
             .map_err(JavascriptExecutionError::InputParse)?;
         expression
-            .call::<Value, Value>("run", &converted)
+            .call::<(Value,), Value>("run", (converted,))
             .map_err(|err| ScenarioRuntimeError::from(JavascriptExecutionError::RuntimeError(err)))
     }
 }
