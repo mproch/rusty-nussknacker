@@ -7,10 +7,16 @@ use std::{
 
 ///This is just an example of how one can use the library. For more production-like usage,
 ///the interpreter would be run as a REST server, or a Kafka consumer.  
+///As this is just an example usage of library, without too much logic, currently there are no tests...
 fn main() {
     let args: Vec<String> = env::args().collect();
+    let print_usage_and_quit = || {
+        panic!("Incorrect number of arguments: {}, usage: rusty-nussknacker scenario_file [scenario_input]. 
+    If input is not provided, it will be read from stdin", args.len()-1)
+    };
+
     if args.len() < 2 {
-        panic!("Incorrect number of arguments: {}", args.len());
+        print_usage_and_quit();
     }
     let interpreter = create_interpreter(Path::new(&args[1])).unwrap();
 
@@ -25,7 +31,7 @@ fn main() {
             let input = &args[2];
             invoke_on_line(interpreter.as_ref(), input)
         }
-        len => panic!("Incorrect number of arguments: {}", len),
+        _ => print_usage_and_quit(),
     }
 }
 

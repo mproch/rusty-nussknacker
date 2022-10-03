@@ -127,6 +127,7 @@ impl Display for JavascriptExecutionError {
 impl Error for JavascriptExecutionError {}
 
 #[cfg(test)]
+//There are far too few tests for this parser.
 mod tests {
     use crate::{
         expression::Parser,
@@ -163,17 +164,24 @@ mod tests {
 
     #[test]
     fn test_nested_multiline_expression() -> Result<(), Box<dyn std::error::Error>> {
+        let input = "my_input";
+        let suffix = "+suffix";
+        let expected = "my_input+suffix";
+
         let expr = JavaScriptParser
             .parse(
-                "[input].map(x => {
-               function add(v1, v2) { return v1 + v2; }
-               return add(x, '+suffix');
-            })[0]",
+                &format!(
+                    "[input].map(x => {{
+               function add(v1, v2) {{ return v1 + v2; }}
+               return add(x, '{}');
+            }})[0]",
+                    suffix
+                ),
                 &CompilationVarContext::default(),
             )
             .unwrap();
-        let res = expr.execute(&VarContext::default_input(json!("my_input")))?;
-        assert_eq!(res, json!("my_input+suffix"));
+        let result = expr.execute(&VarContext::default_input(json!(input)))?;
+        assert_eq!(result, json!(expected));
         Ok(())
     }
 }

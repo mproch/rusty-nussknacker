@@ -44,7 +44,7 @@ mod tests {
     use super::super::tests;
 
     #[test]
-    fn test_outputs() -> Result<(), Box<dyn std::error::Error>> {
+    fn test_filter_outputs() -> Result<(), Box<dyn std::error::Error>> {
         let node_to_test = Node::Filter {
             id: NodeId::new("filter"),
             expression: tests::js("input>5"),

@@ -193,19 +193,23 @@ mod tests {
 
     #[test]
     fn test_variable() {
+        let input = json!(22);
+        let new_var_name = "new_var";
+        let new_var_value = 12;
+
         let node = Variable {
             id: NodeId::new("var"),
-            var_name: String::from("new_var"),
-            expression: js("12"),
+            var_name: String::from(new_var_name),
+            expression: js(&new_var_value.to_string()),
         };
-        let output = compile_invoke_to_output(node, json!(22));
+        let output = compile_invoke_to_output(node, json!(input));
         assert_eq!(
             output,
             ScenarioOutput(vec![SingleScenarioOutput {
                 node_id: NodeId::new("sink"),
                 variables: HashMap::from([
-                    (DEFAULT_INPUT_NAME.to_string(), json!(22)),
-                    (String::from("new_var"), json!(12))
+                    (DEFAULT_INPUT_NAME.to_string(), json!(input)),
+                    (String::from(new_var_name), json!(new_var_value))
                 ])
             }])
         )
