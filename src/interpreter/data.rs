@@ -71,7 +71,7 @@ pub struct SingleScenarioOutput {
     pub variables: HashMap<String, VarValue>,
 }
 
-/// At the moment we assume JSON model. It's certainly simplification, but for the purpose of this excerise it should be enough;
+/// At the moment we assume JSON model. It's certainly a simplification, but for the purpose of this excerise it should be enough;
 pub type VarValue = Value;
 
 /*
@@ -102,6 +102,7 @@ impl CompilationVarContext {
                 var_name: name.to_string(),
             });
         }
+        //we clone to be able to pass it freely to different branches e.g. in split.
         let mut new_ctx = self.clone();
         new_ctx.0.insert(String::from(name), ());
         Ok(new_ctx)

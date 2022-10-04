@@ -31,6 +31,8 @@ impl Compiler {
         let iter = &scenario.nodes;
         let initial_input = CompilationVarContext::default();
         return match iter.first() {
+            //in fact, the source is not needed here, just a marker node.
+            //in real implementation it has some parameters etc. Here it's left just for JSON model compatibility
             Some(Source { id }) => self.compile_next(id, &iter[1..], &initial_input),
             Some(other) => Err(ScenarioCompilationError::FirstNodeNotSource(
                 other.id().clone(),

@@ -9,7 +9,7 @@ pub struct ForEach;
 const VALUE_PARAM: &str = "value";
 
 ///The components requires "value" parameter of array type.
-/// For each element of array, the subsequent part of the scenario is invoked, with the element passed as an output variable
+///For each element of array, the subsequent part of the scenario is invoked, with the element passed as an output variable.
 ///This is the implementation of: https://nussknacker.io/documentation/docs/scenarios_authoring/BasicNodes#foreach
 impl CustomNodeImpl for ForEach {
     fn run(

@@ -13,7 +13,7 @@ can serve as a base for such a service, and a simplistic console app, which read
 At the moment, Javascript expressions and a simple for-each custom component is provided. I hope it will be possible to load other stuff
 e.g. with dlopen.
 
-Now, this is my first Rust project, so for sure there places where it smells Scala/JVM. Some of the things I'm sure can be improved:
+Now, this is my first Rust project, so for sure there are places where it smells Scala/JVM. Some of the things I'm sure can be improved:
 - Errors using some crate that would reduce the boilerplate
 - Constants with lazy_static
 - Restrict pub usage in modules and fields
