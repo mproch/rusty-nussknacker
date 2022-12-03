@@ -9,7 +9,7 @@ pub mod data;
 
 ///This is the main API of the rusty-nussknacker library. It represents 'compiled' scenario,
 ///which can transform input - VarContext into ScenarioOutput
-pub trait Interpreter {
+pub trait Interpreter: Sync + Send {
     fn run(&self, data: &VarContext) -> Result<ScenarioOutput, ScenarioRuntimeError>;
 }
 
@@ -21,7 +21,7 @@ pub type CompilationResult = Result<Box<dyn Interpreter>, ScenarioCompilationErr
 ///Note, that the API allows next_part to be invoked 0..many times, which allows to implement different types
 ///of components, from filter to for-each types.
 ///Sample implementation of for-each is provided in customnodes module.
-pub trait CustomNode {
+pub trait CustomNode: Sync + Send {
     fn run(
         &self,
         output_var: &str,

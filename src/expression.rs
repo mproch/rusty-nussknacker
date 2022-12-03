@@ -16,7 +16,7 @@ pub trait Parser {
     ) -> Result<Box<dyn CompiledExpression>, Box<dyn ParseError>>;
 }
 
-pub trait CompiledExpression {
+pub trait CompiledExpression: Sync + Send {
     fn execute(&self, data: &VarContext) -> Result<VarValue, ScenarioRuntimeError>;
 }
 

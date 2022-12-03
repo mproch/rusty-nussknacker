@@ -7,18 +7,18 @@ use crate::{
     expression::LanguageParser,
     scenariomodel::{Node, Node::*, NodeId, Scenario},
 };
-use std::{collections::HashMap, rc::Rc};
+use std::{collections::HashMap, sync::Arc};
 
 ///The compiler can be customized with additional language runtimes and additional custom components.
 /// By default, simple javascript language parser and for-each components are provided
 pub struct Compiler {
-    custom_nodes: HashMap<String, Rc<dyn super::CustomNode>>,
+    custom_nodes: HashMap<String, Arc<dyn super::CustomNode>>,
     parser: LanguageParser,
 }
 
 impl Default for Compiler {
     fn default() -> Compiler {
-        let for_each: Rc<dyn super::CustomNode> = Rc::new(ForEach);
+        let for_each: Arc<dyn super::CustomNode> = Arc::new(ForEach);
         Compiler {
             custom_nodes: HashMap::from([(String::from("forEach"), for_each)]),
             parser: LanguageParser::default(),
@@ -95,7 +95,7 @@ impl Compiler {
         &self,
         node_id: &NodeId,
         node_type: &str,
-    ) -> Result<&Rc<dyn super::CustomNode>, ScenarioCompilationError> {
+    ) -> Result<&Arc<dyn super::CustomNode>, ScenarioCompilationError> {
         self.custom_nodes.get(node_type).ok_or_else(|| {
             ScenarioCompilationError::UnknownCustomNode {
                 node_id: node_id.clone(),

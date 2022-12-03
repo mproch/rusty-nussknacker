@@ -84,7 +84,7 @@ pub type VarType = ();
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct CompilationVarContext(pub HashMap<String, VarType>);
 
-static VAR_PATTERN: Lazy<Regex> = Lazy::new(|| { Regex::new("^[a-z][a-z0-9_]*$").unwrap() });
+static VAR_PATTERN: Lazy<Regex> = Lazy::new(|| Regex::new("^[a-z][a-z0-9_]*$").unwrap());
 
 impl CompilationVarContext {
     pub fn default() -> CompilationVarContext {
