@@ -13,7 +13,7 @@ struct CompiledSwitch {
     nexts: Vec<CompiledCase>,
 }
 
-pub fn compile(ctx: CompilationContext, nexts: &[Case]) -> CompilationResult {
+pub(super) fn compile(ctx: CompilationContext, nexts: &[Case]) -> CompilationResult {
     let parse_case = |case: &Case| {
         let rest = (ctx.compiler)(&case.nodes[..], ctx.var_names)?;
         let expression = ctx
@@ -33,7 +33,7 @@ struct CompiledCase {
 
 impl Interpreter for CompiledSwitch {
     fn run(&self, data: &VarContext) -> Result<ScenarioOutput, ScenarioRuntimeError> {
-        let mut result: Result<ScenarioOutput, ScenarioRuntimeError> = Ok(ScenarioOutput(vec![]));
+        let mut result = Ok(ScenarioOutput(vec![]));
         for case in &self.nexts {
             let next_expression = case.expression.execute(data)?;
             let matches = (match next_expression {
@@ -83,7 +83,7 @@ mod tests {
         )?;
 
         let input = json!(8);
-        let result = compiled.run(&VarContext::default_input(input.clone()))?;
+        let result = compiled.run(&VarContext::default_context_for_value(input.clone()))?;
         assert_eq!(
             result.var_in_sink(&left_sink_id, DEFAULT_INPUT_NAME),
             [Some(&input)]
@@ -91,7 +91,7 @@ mod tests {
         assert_eq!(result.var_in_sink(&right_sink_id, DEFAULT_INPUT_NAME), []);
 
         let input = json!(-5);
-        let result = compiled.run(&VarContext::default_input(input.clone()))?;
+        let result = compiled.run(&VarContext::default_context_for_value(input.clone()))?;
         assert_eq!(result.var_in_sink(&left_sink_id, DEFAULT_INPUT_NAME), []);
         assert_eq!(
             result.var_in_sink(&right_sink_id, DEFAULT_INPUT_NAME),

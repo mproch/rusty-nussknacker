@@ -21,7 +21,7 @@ pub type CompilationResult = Result<Box<dyn Interpreter>, ScenarioCompilationErr
 ///Note, that the API allows next_part to be invoked 0..many times, which allows to implement different types
 ///of components, from filter to for-each types.
 ///Sample implementation of for-each is provided in customnodes module.
-pub trait CustomNodeImpl {
+pub trait CustomNode {
     fn run(
         &self,
         output_var: &str,

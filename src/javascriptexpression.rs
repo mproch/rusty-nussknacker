@@ -8,20 +8,6 @@ use crate::{
 use js_sandbox::{AnyError, Script};
 use serde_json::Value;
 
-/*
-I use global state to cache compiled scripts. This is not what I'd like to do, but:
-- Script.call mutates self.
-- I don't want to make all the expression/scenario API mutable - it shouldn't be this way.
-- I couldn't find any way to invoke Script (or any other library to invoke JS expressions) without mutating it. This is reasonable,
-  because in general JS expressions can mutate global state of JS Runtime... Hopefuly in the future it will be possible with FrozenRealms or sth
-  like that. Currently, the implementation is "unsafe" - one write `Object.global = input` and pass the state to next invocation on a given thread...
-
-Other way to solve this is to parse Script on each invocation, but it's hopelessly inefficient then.
-*/
-thread_local! {
-    static CACHED_SCRIPTS: RefCell<HashMap<String,Script>>  = RefCell::new(HashMap::from([]));
-}
-
 pub struct JavaScriptParser;
 
 ///Essentially we wrap given expression in a function, that takes one argument (as it's required by js-sandbox crate), and destructures in
@@ -63,6 +49,20 @@ struct JavascriptExpression {
 }
 
 impl JavascriptExpression {
+    /*
+    I use global state to cache compiled scripts. This is not what I'd like to do, but:
+    - Script.call mutates self.
+    - I don't want to make all the expression/scenario API mutable - it shouldn't be this way.
+    - I couldn't find any way to invoke Script (or any other library to invoke JS expressions) without mutating it. This is reasonable,
+    because in general JS expressions can mutate global state of JS Runtime... Hopefuly in the future it will be possible with FrozenRealms or sth
+    like that. Currently, the implementation is "unsafe" - one write `Object.global = input` and pass the state to next invocation on a given thread...
+
+    Other way to solve this is to parse Script on each invocation, but it's hopelessly inefficient then.
+    */
+    thread_local! {
+        static CACHED_SCRIPTS: RefCell<HashMap<String,Script>>  = RefCell::new(HashMap::from([]));
+    }
+
     fn execute_script(
         script: &mut Script,
         input_data: &VarContext,
@@ -77,7 +77,7 @@ impl JavascriptExpression {
 
 impl CompiledExpression for JavascriptExpression {
     fn execute(&self, input_data: &VarContext) -> Result<VarValue, ScenarioRuntimeError> {
-        CACHED_SCRIPTS.with(|c| {
+        JavascriptExpression::CACHED_SCRIPTS.with(|c| {
             let mut map = c.borrow_mut();
             if !map.contains_key(&self.transformed) {
                 let expression = Script::from_string(&self.transformed)
@@ -157,7 +157,7 @@ mod tests {
         let expr = JavaScriptParser
             .parse("input + 5", &CompilationVarContext::default())
             .unwrap();
-        let res = expr.execute(&VarContext::default_input(json!(10)))?;
+        let res = expr.execute(&VarContext::default_context_for_value(json!(10)))?;
         assert_eq!(res, json!(15));
         Ok(())
     }
@@ -180,7 +180,7 @@ mod tests {
                 &CompilationVarContext::default(),
             )
             .unwrap();
-        let result = expr.execute(&VarContext::default_input(json!(input)))?;
+        let result = expr.execute(&VarContext::default_context_for_value(json!(input)))?;
         assert_eq!(result, json!(expected));
         Ok(())
     }

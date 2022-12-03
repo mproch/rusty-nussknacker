@@ -12,7 +12,7 @@ pub struct CompiledSink {
     node_id: NodeId,
 }
 
-pub fn compile(ctx: CompilationContext, sink_id: &NodeId) -> CompilationResult {
+pub(super) fn compile(ctx: CompilationContext, sink_id: &NodeId) -> CompilationResult {
     ctx.assert_end(Box::new(CompiledSink {
         node_id: sink_id.clone(),
     }))

@@ -15,7 +15,7 @@ struct CompiledVariable {
     var_name: String,
 }
 
-pub fn compile(
+pub(super) fn compile(
     ctx: CompilationContext,
     var_name: &str,
     raw_expression: &Expression,
@@ -34,7 +34,7 @@ pub fn compile(
 impl Interpreter for CompiledVariable {
     fn run(&self, data: &VarContext) -> Result<ScenarioOutput, ScenarioRuntimeError> {
         let result = self.expression.execute(data)?;
-        let with_var = data.insert(&self.var_name, result);
+        let with_var = data.with_new_var(&self.var_name, result);
         self.rest.run(&with_var)
     }
 }
@@ -62,7 +62,7 @@ mod tests {
         let input = json!("terefere");
         let output = json!("terefere-suffix");
 
-        let result = compiled.run(&VarContext::default_input(input))?;
+        let result = compiled.run(&VarContext::default_context_for_value(input))?;
         assert_eq!(result.var_in_sink(&sink_id, output_name), [Some(&output)]);
 
         Ok(())

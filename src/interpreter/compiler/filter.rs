@@ -14,7 +14,7 @@ struct CompiledFilter {
     expression: Box<dyn CompiledExpression>,
 }
 
-pub fn compile(ctx: CompilationContext, expression: &Expression) -> CompilationResult {
+pub(super) fn compile(ctx: CompilationContext, expression: &Expression) -> CompilationResult {
     let rest = (ctx.compiler)(ctx.rest, ctx.var_names)?;
     let expression = ctx.parser.parse(ctx.node_id, expression, ctx.var_names)?;
     let res = CompiledFilter { rest, expression };
@@ -53,11 +53,11 @@ mod tests {
 
         let compiled = tests::compile_node(node_to_test, &tests::sink(&sink_id))?;
 
-        let result = compiled.run(&VarContext::default_input(json!(3)))?;
+        let result = compiled.run(&VarContext::default_context_for_value(json!(3)))?;
         assert_eq!(result.var_in_sink(&sink_id, DEFAULT_INPUT_NAME), []);
 
         let input = json!(8);
-        let result = compiled.run(&VarContext::default_input(input.clone()))?;
+        let result = compiled.run(&VarContext::default_context_for_value(input.clone()))?;
         assert_eq!(
             result.var_in_sink(&sink_id, DEFAULT_INPUT_NAME),
             [Some(&input)]

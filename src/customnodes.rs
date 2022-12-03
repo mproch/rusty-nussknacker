@@ -1,6 +1,6 @@
 use crate::interpreter::{
     data::{ScenarioOutput, ScenarioRuntimeError, VarContext, VarValue},
-    CustomNodeImpl, Interpreter,
+    CustomNode, Interpreter,
 };
 use serde_json::Value::{self, Array};
 use std::{collections::HashMap, error::Error, fmt::Display};
@@ -11,7 +11,7 @@ const VALUE_PARAM: &str = "value";
 ///The components requires "value" parameter of array type.
 ///For each element of array, the subsequent part of the scenario is invoked, with the element passed as an output variable.
 ///This is the implementation of: https://nussknacker.io/documentation/docs/scenarios_authoring/BasicNodes#foreach
-impl CustomNodeImpl for ForEach {
+impl CustomNode for ForEach {
     fn run(
         &self,
         output_var: &str,
@@ -20,7 +20,7 @@ impl CustomNodeImpl for ForEach {
         next_part: &dyn Interpreter,
     ) -> Result<ScenarioOutput, ScenarioRuntimeError> {
         let run = |v: &Value| {
-            let new_data = data.insert(output_var, v.clone());
+            let new_data = data.with_new_var(output_var, v.clone());
             next_part.run(&new_data)
         };
         match parameters.get(VALUE_PARAM) {
@@ -69,7 +69,7 @@ mod tests {
             data::{
                 ScenarioOutput, ScenarioRuntimeError, SingleScenarioOutput, VarContext, VarValue,
             },
-            CustomNodeImpl, Interpreter,
+            CustomNode, Interpreter,
         },
         scenariomodel::NodeId,
     };

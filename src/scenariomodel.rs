@@ -56,12 +56,6 @@ pub enum Node {
         node_type: String,
         parameters: Vec<Parameter>,
     },
-    //Not implemented at the moment, can be expressed with CustomNode anyway...
-    // Enricher {
-    //     id: NodeId,
-    //     output: String,
-    //     service_ref: ServiceRef,
-    // },
 }
 
 impl Node {

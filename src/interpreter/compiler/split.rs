@@ -8,11 +8,11 @@ use crate::{
 
 use super::CompilationContext;
 
-struct CompiledSplit {
+pub(super) struct CompiledSplit {
     nexts: Vec<Box<dyn Interpreter>>,
 }
 
-pub fn compile(ctx: CompilationContext, nexts: &[Vec<Node>]) -> CompilationResult {
+pub(super) fn compile(ctx: CompilationContext, nexts: &[Vec<Node>]) -> CompilationResult {
     let compiled: Result<Vec<Box<dyn Interpreter>>, ScenarioCompilationError> = nexts
         .iter()
         .map(|n| (ctx.compiler)(&n[..], ctx.var_names))
@@ -52,7 +52,7 @@ mod tests {
         let compiled = tests::compile_node(node_to_test, &[])?;
 
         let input = json!("to_copy");
-        let result = compiled.run(&VarContext::default_input(input.clone()))?;
+        let result = compiled.run(&VarContext::default_context_for_value(input.clone()))?;
         assert_eq!(
             result.var_in_sink(&branch1, DEFAULT_INPUT_NAME),
             [Some(&input)]

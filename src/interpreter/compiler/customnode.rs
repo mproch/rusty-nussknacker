@@ -6,7 +6,7 @@ use crate::{
         data::{
             ScenarioCompilationError, ScenarioOutput, ScenarioRuntimeError, VarContext, VarValue,
         },
-        CompilationResult, CustomNodeImpl, Interpreter,
+        CompilationResult, CustomNode, Interpreter,
     },
     scenariomodel::Parameter,
 };
@@ -17,14 +17,14 @@ struct CompiledCustomNode {
     rest: Box<dyn Interpreter>,
     output_var: String,
     params: HashMap<String, Box<dyn CompiledExpression>>,
-    custom_node: Rc<dyn CustomNodeImpl>,
+    custom_node: Rc<dyn CustomNode>,
 }
 
-pub fn compile(
+pub(super) fn compile(
     ctx: CompilationContext,
     output_var: &str,
     parameters: &[Parameter],
-    implementation: &Rc<dyn CustomNodeImpl>,
+    implementation: &Rc<dyn CustomNode>,
 ) -> CompilationResult {
     let next_part = (ctx.compiler)(ctx.rest, &ctx.var_names.with_var(ctx.node_id, output_var)?)?;
     let compiled_parameters: Result<

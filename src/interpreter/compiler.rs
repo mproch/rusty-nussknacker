@@ -1,6 +1,6 @@
 use super::{
     data::{CompilationVarContext, ScenarioCompilationError},
-    CompilationResult, CustomNodeImpl, Interpreter,
+    CompilationResult, Interpreter,
 };
 use crate::{
     customnodes::ForEach,
@@ -12,28 +12,28 @@ use std::{collections::HashMap, rc::Rc};
 ///The compiler can be customized with additional language runtimes and additional custom components.
 /// By default, simple javascript language parser and for-each components are provided
 pub struct Compiler {
-    custom_nodes: HashMap<String, Rc<dyn CustomNodeImpl>>,
+    custom_nodes: HashMap<String, Rc<dyn super::CustomNode>>,
     parser: LanguageParser,
 }
 
 impl Default for Compiler {
     fn default() -> Compiler {
-        let for_each: Rc<dyn CustomNodeImpl> = Rc::new(ForEach);
+        let for_each: Rc<dyn super::CustomNode> = Rc::new(ForEach);
         Compiler {
             custom_nodes: HashMap::from([(String::from("forEach"), for_each)]),
-            parser: Default::default(),
+            parser: LanguageParser::default(),
         }
     }
 }
 
 impl Compiler {
     pub fn compile(&self, scenario: &Scenario) -> CompilationResult {
-        let iter = &scenario.nodes;
+        let nodes = &scenario.nodes;
         let initial_input = CompilationVarContext::default();
-        return match iter.first() {
+        return match nodes.first() {
             //in fact, the source is not needed here, just a marker node.
             //in real implementation it has some parameters etc. Here it's left just for JSON model compatibility
-            Some(Source { id }) => self.compile_next(id, &iter[1..], &initial_input),
+            Some(Source { id }) => self.compile_next(id, &nodes[1..], &initial_input),
             Some(other) => Err(ScenarioCompilationError::FirstNodeNotSource(
                 other.id().clone(),
             )),
@@ -44,11 +44,11 @@ impl Compiler {
     fn compile_next(
         &self,
         node_id: &NodeId,
-        iter: &[Node],
+        next_nodes: &[Node],
         var_names: &CompilationVarContext,
     ) -> CompilationResult {
-        match iter.first() {
-            Some(first) => self.compile_next_node(first, &iter[1..], var_names),
+        match next_nodes.first() {
+            Some(first) => self.compile_next_node(first, &next_nodes[1..], var_names),
             None => Err(ScenarioCompilationError::InvalidEnd(node_id.clone())),
         }
     }
@@ -56,13 +56,13 @@ impl Compiler {
     fn compile_next_node(
         &self,
         head: &Node,
-        rest: &[Node],
+        next_nodes: &[Node],
         var_names: &CompilationVarContext,
     ) -> CompilationResult {
         let ctx = CompilationContext {
             parser: &self.parser,
             var_names,
-            rest,
+            rest: next_nodes,
             node_id: head.id(),
             compiler: &|nds, ctx| self.compile_next(head.id(), nds, ctx),
         };
@@ -95,7 +95,7 @@ impl Compiler {
         &self,
         node_id: &NodeId,
         node_type: &str,
-    ) -> Result<&Rc<dyn CustomNodeImpl>, ScenarioCompilationError> {
+    ) -> Result<&Rc<dyn super::CustomNode>, ScenarioCompilationError> {
         self.custom_nodes.get(node_type).ok_or_else(|| {
             ScenarioCompilationError::UnknownCustomNode {
                 node_id: node_id.clone(),
@@ -112,8 +112,7 @@ mod split;
 mod switch;
 mod variable;
 
-//I was hoping that if child modules are not public, I will be able to make this struct private, but somehow I can't...
-pub struct CompilationContext<'a> {
+struct CompilationContext<'a> {
     parser: &'a LanguageParser,
     compiler: &'a dyn Fn(&[Node], &CompilationVarContext) -> CompilationResult,
     var_names: &'a CompilationVarContext,
@@ -189,7 +188,7 @@ mod tests {
         };
         let compiled_scenario = Compiler::default().compile(&scenario).unwrap();
         compiled_scenario
-            .run(&VarContext::default_input(input))
+            .run(&VarContext::default_context_for_value(input))
             .unwrap()
     }
 

@@ -9,7 +9,7 @@ pub fn simple_expression_benchmark(c: &mut Criterion) {
     c.bench_function("scenario split", |b| {
         b.iter(|| {
             interpreter
-                .run(black_box(&VarContext::default_input(json!(4))))
+                .run(black_box(&VarContext::default_context_for_value(json!(4))))
                 .unwrap()
         })
     });

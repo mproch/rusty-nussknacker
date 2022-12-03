@@ -19,7 +19,7 @@ pub fn simple_expression_benchmark(c: &mut Criterion) {
         .unwrap();
 
     c.bench_function("expr input + 5", |b| {
-        b.iter(|| expr.execute(&VarContext::default_input(black_box(json!(10)))))
+        b.iter(|| expr.execute(&VarContext::default_context_for_value(black_box(json!(10)))))
     });
 }
 

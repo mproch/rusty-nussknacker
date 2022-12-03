@@ -4,6 +4,7 @@ use serde_json::Value;
 use std::{collections::HashMap, rc::Rc};
 
 use crate::scenariomodel::{Node, NodeId};
+use once_cell::sync::Lazy;
 
 /// Data passed through scenario
 /// We keep Rc<VarValue> as value in map to avoid excessive cloning.
@@ -17,7 +18,7 @@ impl VarContext {
         VarContext(HashMap::from([]))
     }
 
-    pub fn default_input(value: Value) -> VarContext {
+    pub fn default_context_for_value(value: Value) -> VarContext {
         VarContext(HashMap::from([(
             DEFAULT_INPUT_NAME.to_string(),
             Rc::new(value),
@@ -32,7 +33,7 @@ impl VarContext {
             .map(|f| (f.0.clone(), f.1.as_ref().to_owned()))
             .collect();
     }
-    pub fn insert(&self, name: &str, value: Value) -> VarContext {
+    pub fn with_new_var(&self, name: &str, value: Value) -> VarContext {
         let mut result = self.clone();
         result.0.insert(String::from(name), Rc::new(value));
         result
@@ -83,8 +84,7 @@ pub type VarType = ();
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct CompilationVarContext(pub HashMap<String, VarType>);
 
-//not sure how to make this thread_local nicer?
-thread_local!(static VAR_PATTERN: Regex = Regex::new("^[a-z][a-z0-9_]*$").unwrap());
+static VAR_PATTERN: Lazy<Regex> = Lazy::new(|| { Regex::new("^[a-z][a-z0-9_]*$").unwrap() });
 
 impl CompilationVarContext {
     pub fn default() -> CompilationVarContext {
@@ -96,7 +96,7 @@ impl CompilationVarContext {
         node_id: &NodeId,
         name: &str,
     ) -> Result<CompilationVarContext, ScenarioCompilationError> {
-        if !VAR_PATTERN.with(|r| r.is_match(name)) {
+        if !VAR_PATTERN.is_match(name) {
             return Err(ScenarioCompilationError::IncorrectVariableName {
                 node_id: node_id.clone(),
                 var_name: name.to_string(),

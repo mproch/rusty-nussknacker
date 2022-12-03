@@ -1,42 +1,40 @@
+use clap::Parser;
 use rusty_nussknacker::{create_interpreter, interpreter::Interpreter, invoke_interpreter};
 use std::{
-    env,
     io::{self, BufRead},
-    path::Path,
+    path::PathBuf,
     process::exit,
 };
+
+#[derive(Parser)]
+#[clap(author, version, about, long_about = None)]
+struct Args {
+    #[clap(short, long, value_parser, value_name = "FILE")]
+    pub scenario_file: PathBuf,
+
+    #[clap(value_parser)]
+    pub input: Option<String>,
+}
 
 ///This is just an example of how one can use the library. For more production-like usage,
 ///the interpreter would be run as a REST server, or a Kafka consumer.  
 ///As this is just an example usage of library, without too much logic, currently there are no tests...
 fn main() {
-    let args: Vec<String> = env::args().collect();
-    let print_usage_and_quit = || {
-        eprintln!("Incorrect number of arguments: {}, usage: rusty-nussknacker scenario_file [scenario_input]. 
-    If input is not provided, it will be read from stdin", args.len()-1);
-        exit(1);
-    };
+    let args = Args::parse();
 
-    if args.len() < 2 {
-        print_usage_and_quit();
-    }
-    let interpreter = create_interpreter(Path::new(&args[1])).unwrap_or_else(|err| {
+    let interpreter = create_interpreter(args.scenario_file.as_path()).unwrap_or_else(|err| {
         eprintln!("Failed to parse scenario: {err}");
         exit(1);
     });
 
-    match args.len() {
-        2 => {
+    match args.input {
+        None => {
             let stdin = io::stdin();
             for line in stdin.lock().lines() {
                 invoke_on_line(interpreter.as_ref(), &line.unwrap())
             }
         }
-        3 => {
-            let input = &args[2];
-            invoke_on_line(interpreter.as_ref(), input)
-        }
-        _ => print_usage_and_quit(),
+        Some(input) => invoke_on_line(interpreter.as_ref(), &input),
     }
 }
 
