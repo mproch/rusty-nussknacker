@@ -53,7 +53,7 @@ mod tests {
         let node_to_test = Node::Variable {
             id: NodeId::new("filter"),
             var_name: output_name.to_string(),
-            expression: tests::js("input + '-suffix'"),
+            value: tests::js("input + '-suffix'"),
         };
         let sink_id = NodeId::new("sink1");
 

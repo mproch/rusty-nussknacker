@@ -46,7 +46,7 @@ pub enum Node {
         id: NodeId,
         #[serde(rename = "varName")]
         var_name: String,
-        expression: Expression,
+        value: Expression,
     },
     CustomNode {
         id: NodeId,
@@ -68,7 +68,7 @@ impl Node {
             Node::Variable {
                 id,
                 var_name: _,
-                expression: _,
+                value: _,
             } => id,
             Node::CustomNode {
                 id,

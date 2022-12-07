@@ -71,8 +71,8 @@ impl Compiler {
             Variable {
                 id: _,
                 var_name,
-                expression,
-            } => variable::compile(ctx, var_name, expression),
+                value,
+            } => variable::compile(ctx, var_name, value),
             Switch { id: _, nexts } => switch::compile(ctx, nexts),
             Split { id: _, nexts } => split::compile(ctx, nexts),
             Sink { id } => sink::compile(ctx, id),
@@ -201,7 +201,7 @@ mod tests {
         let node = Variable {
             id: NodeId::new("var"),
             var_name: String::from(new_var_name),
-            expression: js(&new_var_value.to_string()),
+            value: js(&new_var_value.to_string()),
         };
         let output = compile_invoke_to_output(node, json!(input));
         assert_eq!(

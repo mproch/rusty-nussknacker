@@ -854,8 +854,6 @@ checksum = "6c8af84674fe1f223a982c933a0ee1086ac4d4052aa0fb8060c12c6ad838e754"
 [[package]]
 name = "js-sandbox"
 version = "0.2.0-rc.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "23703227a796151063b14e733acfa83d79c09a755159296a59bfa5eebafbf4ce"
 dependencies = [
  "deno_core",
  "js-sandbox-macros",
@@ -866,8 +864,6 @@ dependencies = [
 [[package]]
 name = "js-sandbox-macros"
 version = "0.2.0-rc.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2a8ec78dc63c615a7829c096f5c5ff7395331574ea26290821f8321ec8725aef"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1455,6 +1451,7 @@ version = "0.1.0"
 dependencies = [
  "clap 3.2.2",
  "criterion",
+ "deno_core",
  "js-sandbox",
  "once_cell",
  "regex",

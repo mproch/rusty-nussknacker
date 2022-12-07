@@ -32,8 +32,9 @@ impl Parser for JavaScriptParser {
         }}"#,
             keys, expression
         );
+        let buffer = include_bytes!("../snapshots/query_runtime.snap");
         //we ignore the result, as we just want to check if expression is correct
-        let _compiled = Script::from_string(&expanded).map_err(|err| {
+        let _compiled = Script::from_string(&expanded, Some(buffer)).map_err(|err| {
             //looks clumsy, but type inference fails here :/
             let ret: Box<dyn ParseError> = Box::new(JavascriptParseError(err));
             ret
@@ -80,7 +81,8 @@ impl CompiledExpression for JavascriptExpression {
         JavascriptExpression::CACHED_SCRIPTS.with(|c| {
             let mut map = c.borrow_mut();
             if !map.contains_key(&self.transformed) {
-                let expression = Script::from_string(&self.transformed)
+                let buffer = include_bytes!("../snapshots/query_runtime.snap");
+                let expression = Script::from_string(&self.transformed, Some(buffer))
                     .map_err(JavascriptExecutionError::ScriptParse)?;
                 map.insert(self.transformed.clone(), expression);
             }
