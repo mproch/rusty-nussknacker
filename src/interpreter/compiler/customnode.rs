@@ -1,5 +1,7 @@
 use std::{collections::HashMap, sync::Arc};
 
+use async_trait::async_trait;
+
 use crate::{
     expression::CompiledExpression,
     interpreter::{
@@ -52,8 +54,9 @@ fn compile_parameter(
     Ok((parameter.name.clone(), compiled_expression))
 }
 
+#[async_trait]
 impl Interpreter for CompiledCustomNode {
-    fn run(&self, data: &VarContext) -> Result<ScenarioOutput, ScenarioRuntimeError> {
+    async fn run(&self, data: &VarContext) -> Result<ScenarioOutput, ScenarioRuntimeError> {
         let parameters: Result<HashMap<String, VarValue>, ScenarioRuntimeError> = self
             .params
             .iter()
@@ -62,5 +65,6 @@ impl Interpreter for CompiledCustomNode {
             .collect();
         self.custom_node
             .run(&self.output_var, &parameters?, data, self.rest.as_ref())
+            .await
     }
 }

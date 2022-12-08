@@ -6,6 +6,7 @@ use crate::{
     },
     scenariomodel::Case,
 };
+use async_trait::async_trait;
 use serde_json::Value::Bool;
 
 use super::CompilationContext;
@@ -31,8 +32,9 @@ struct CompiledCase {
     expression: Box<dyn CompiledExpression>,
 }
 
+#[async_trait]
 impl Interpreter for CompiledSwitch {
-    fn run(&self, data: &VarContext) -> Result<ScenarioOutput, ScenarioRuntimeError> {
+    async fn run(&self, data: &VarContext) -> Result<ScenarioOutput, ScenarioRuntimeError> {
         let mut result = Ok(ScenarioOutput(vec![]));
         for case in &self.nexts {
             let next_expression = case.expression.execute(data)?;
@@ -41,7 +43,7 @@ impl Interpreter for CompiledSwitch {
                 other => Err(ScenarioRuntimeError::InvalidSwitchType(other)),
             })?;
             if matches {
-                result = case.rest.run(data);
+                result = case.rest.run(data).await;
                 break;
             }
         }
@@ -59,6 +61,7 @@ mod tests {
     };
 
     use super::super::tests;
+    use tokio_test::block_on;
 
     #[test]
     fn test_outputs() -> Result<(), Box<dyn std::error::Error>> {
@@ -83,7 +86,7 @@ mod tests {
         )?;
 
         let input = json!(8);
-        let result = compiled.run(&VarContext::default_context_for_value(input.clone()))?;
+        let result = block_on(compiled.run(&VarContext::default_context_for_value(input.clone())))?;
         assert_eq!(
             result.var_in_sink(&left_sink_id, DEFAULT_INPUT_NAME),
             [Some(&input)]
@@ -91,7 +94,7 @@ mod tests {
         assert_eq!(result.var_in_sink(&right_sink_id, DEFAULT_INPUT_NAME), []);
 
         let input = json!(-5);
-        let result = compiled.run(&VarContext::default_context_for_value(input.clone()))?;
+        let result = block_on(compiled.run(&VarContext::default_context_for_value(input.clone())))?;
         assert_eq!(result.var_in_sink(&left_sink_id, DEFAULT_INPUT_NAME), []);
         assert_eq!(
             result.var_in_sink(&right_sink_id, DEFAULT_INPUT_NAME),

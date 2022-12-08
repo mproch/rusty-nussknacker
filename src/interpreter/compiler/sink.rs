@@ -1,3 +1,5 @@
+use async_trait::async_trait;
+
 use crate::{
     interpreter::{
         data::{ScenarioOutput, ScenarioRuntimeError, SingleScenarioOutput, VarContext},
@@ -18,8 +20,9 @@ pub(super) fn compile(ctx: CompilationContext, sink_id: &NodeId) -> CompilationR
     }))
 }
 
+#[async_trait]
 impl Interpreter for CompiledSink {
-    fn run(&self, data: &VarContext) -> Result<ScenarioOutput, ScenarioRuntimeError> {
+    async fn run(&self, data: &VarContext) -> Result<ScenarioOutput, ScenarioRuntimeError> {
         Ok(ScenarioOutput(vec![SingleScenarioOutput {
             node_id: self.node_id.clone(),
             variables: data.to_external_form(),

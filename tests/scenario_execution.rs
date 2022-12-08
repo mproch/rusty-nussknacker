@@ -5,6 +5,7 @@ use rusty_nussknacker::create_interpreter;
 use rusty_nussknacker::interpreter::data::VarContext;
 use rusty_nussknacker::scenariomodel::NodeId;
 use serde_json::json;
+use tokio_test::block_on;
 
 type Result<T> = std::result::Result<T, Box<dyn error::Error>>;
 
@@ -13,7 +14,7 @@ fn test_scenario_with_custom_node() -> Result<()> {
     let interpreter = create_interpreter(scenario("with_custom.json").as_path())?;
 
     let input = VarContext::default_context_for_value(json!(""));
-    let output = interpreter.run(&input)?;
+    let output = block_on(interpreter.run(&input))?;
     assert_eq!(
         output.var_in_sink(&NodeId::new("sink"), "each"),
         vec![Some(&json!("a")), Some(&json!("b")), Some(&json!("c"))]
@@ -26,7 +27,7 @@ fn test_scenario_with_split() -> Result<()> {
     let interpreter = create_interpreter(scenario("with_split.json").as_path())?;
 
     let input = VarContext::default_context_for_value(json!(4));
-    let output = interpreter.run(&input)?;
+    let output = block_on(interpreter.run(&input))?;
     assert_eq!(
         output.var_in_sink(&NodeId::new("sink1"), "additional"),
         vec![Some(&json!(true))]

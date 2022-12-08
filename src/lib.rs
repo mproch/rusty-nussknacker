@@ -22,10 +22,12 @@ pub fn create_interpreter(scenario_path: &Path) -> CompilationResult {
     compiler.compile(&scenario)
 }
 
-pub fn invoke_interpreter(
+pub async fn invoke_interpreter(
     runtime: &dyn Interpreter,
     input: &str,
 ) -> Result<ScenarioOutput, ScenarioRuntimeError> {
     let input = serde_json::from_str(input).map_err(ScenarioRuntimeError::CannotParseInput)?;
-    runtime.run(&VarContext::default_context_for_value(input))
+    runtime
+        .run(&VarContext::default_context_for_value(input))
+        .await
 }

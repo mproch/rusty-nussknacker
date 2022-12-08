@@ -154,6 +154,7 @@ mod tests {
     use serde_json::json;
     use serde_json::Value;
     use std::collections::HashMap;
+    use tokio_test::block_on;
 
     pub fn compile_node(node: Node, rest: &[Node]) -> CompilationResult {
         let var_ctx = CompilationVarContext::default();
@@ -187,9 +188,7 @@ mod tests {
             ],
         };
         let compiled_scenario = Compiler::default().compile(&scenario).unwrap();
-        compiled_scenario
-            .run(&VarContext::default_context_for_value(input))
-            .unwrap()
+        block_on(compiled_scenario.run(&VarContext::default_context_for_value(input))).unwrap()
     }
 
     #[test]

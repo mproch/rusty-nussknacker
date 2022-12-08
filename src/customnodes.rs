@@ -2,6 +2,8 @@ use crate::interpreter::{
     data::{ScenarioOutput, ScenarioRuntimeError, VarContext, VarValue},
     CustomNode, Interpreter,
 };
+use async_trait::async_trait;
+use futures::future::join_all;
 use serde_json::Value::{self, Array};
 use std::{collections::HashMap, error::Error, fmt::Display};
 pub struct ForEach;
@@ -11,22 +13,26 @@ const VALUE_PARAM: &str = "value";
 ///The components requires "value" parameter of array type.
 ///For each element of array, the subsequent part of the scenario is invoked, with the element passed as an output variable.
 ///This is the implementation of: https://nussknacker.io/documentation/docs/scenarios_authoring/BasicNodes#foreach
+#[async_trait]
 impl CustomNode for ForEach {
-    fn run(
+    async fn run(
         &self,
         output_var: &str,
         parameters: &HashMap<String, VarValue>,
         data: &VarContext,
         next_part: &dyn Interpreter,
     ) -> Result<ScenarioOutput, ScenarioRuntimeError> {
-        let run = |v: &Value| {
-            let new_data = data.with_new_var(output_var, v.clone());
-            next_part.run(&new_data)
-        };
         match parameters.get(VALUE_PARAM) {
             Some(Array(values)) => {
+                let new_values: Vec<VarContext> = values
+                    .iter()
+                    .map(|v| data.with_new_var(output_var, v.clone()))
+                    .collect();
                 let output_result: Result<Vec<ScenarioOutput>, ScenarioRuntimeError> =
-                    values.iter().map(run).collect();
+                    join_all(new_values.iter().map(|k| next_part.run(k)))
+                        .await
+                        .into_iter()
+                        .collect();
                 output_result.map(ScenarioOutput::flatten)
             }
             Some(other) => Err(ScenarioRuntimeError::from(ForEachError::WrongValueType(
@@ -73,8 +79,10 @@ mod tests {
         },
         scenariomodel::NodeId,
     };
+    use async_trait::async_trait;
     use serde_json::{json, Value};
     use std::collections::HashMap;
+    use tokio_test::block_on;
 
     use super::{ForEach, VALUE_PARAM};
 
@@ -82,8 +90,9 @@ mod tests {
 
     struct MockInterpreter {}
 
+    #[async_trait]
     impl Interpreter for MockInterpreter {
-        fn run(&self, data: &VarContext) -> Result<ScenarioOutput, ScenarioRuntimeError> {
+        async fn run(&self, data: &VarContext) -> Result<ScenarioOutput, ScenarioRuntimeError> {
             Ok(ScenarioOutput(vec![SingleScenarioOutput {
                 node_id: NodeId::new(TEST_OUTPUT),
                 variables: data.to_external_form(),
@@ -99,7 +108,8 @@ mod tests {
 
         let check_for_value = |v: &[&VarValue]| -> Result<(), ScenarioRuntimeError> {
             let parameters = HashMap::from([(VALUE_PARAM.to_owned(), json!(v))]);
-            let result = foreach.run(output_var, &parameters, &VarContext::empty(), &next_part)?;
+            let result =
+                block_on(foreach.run(output_var, &parameters, &VarContext::empty(), &next_part))?;
             let values: Vec<&VarValue> = result
                 .var_in_sink(&NodeId::new(TEST_OUTPUT), output_var)
                 .iter()
@@ -122,9 +132,9 @@ mod tests {
         let output_var = "output";
 
         let test_parameter = |params: &HashMap<String, VarValue>, expected_error: ForEachError| {
-            let result = foreach
-                .run(output_var, params, &VarContext::empty(), &next_part)
-                .unwrap_err();
+            let result =
+                block_on(foreach.run(output_var, params, &VarContext::empty(), &next_part))
+                    .unwrap_err();
             let error = match result {
                 ScenarioRuntimeError::CustomNodeError(error) => {
                     error.downcast::<ForEachError>().unwrap()

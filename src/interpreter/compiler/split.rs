@@ -1,3 +1,6 @@
+use async_trait::async_trait;
+use futures::future::join_all;
+
 use crate::{
     interpreter::{
         data::{ScenarioCompilationError, ScenarioOutput, ScenarioRuntimeError, VarContext},
@@ -20,22 +23,26 @@ pub(super) fn compile(ctx: CompilationContext, nexts: &[Vec<Node>]) -> Compilati
     ctx.assert_end(Box::new(CompiledSplit { nexts: compiled? }))
 }
 
+#[async_trait]
 impl Interpreter for CompiledSplit {
-    fn run(&self, data: &VarContext) -> Result<ScenarioOutput, ScenarioRuntimeError> {
+    async fn run(&self, data: &VarContext) -> Result<ScenarioOutput, ScenarioRuntimeError> {
         let output_result: Result<Vec<ScenarioOutput>, ScenarioRuntimeError> =
-            self.nexts.iter().map(|one| one.run(data)).collect();
+            join_all(self.nexts.iter().map(|one| one.run(data)))
+                .await
+                .into_iter()
+                .collect();
         output_result.map(ScenarioOutput::flatten)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use serde_json::json;
-
     use crate::{
         interpreter::data::{VarContext, DEFAULT_INPUT_NAME},
         scenariomodel::{Node, NodeId},
     };
+    use serde_json::json;
+    use tokio_test::block_on;
 
     use super::super::tests;
 
@@ -52,7 +59,7 @@ mod tests {
         let compiled = tests::compile_node(node_to_test, &[])?;
 
         let input = json!("to_copy");
-        let result = compiled.run(&VarContext::default_context_for_value(input.clone()))?;
+        let result = block_on(compiled.run(&VarContext::default_context_for_value(input.clone())))?;
         assert_eq!(
             result.var_in_sink(&branch1, DEFAULT_INPUT_NAME),
             [Some(&input)]

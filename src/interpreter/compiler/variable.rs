@@ -1,3 +1,5 @@
+use async_trait::async_trait;
+
 use crate::{
     expression::CompiledExpression,
     interpreter::{
@@ -31,11 +33,12 @@ pub(super) fn compile(
     }))
 }
 
+#[async_trait]
 impl Interpreter for CompiledVariable {
-    fn run(&self, data: &VarContext) -> Result<ScenarioOutput, ScenarioRuntimeError> {
+    async fn run(&self, data: &VarContext) -> Result<ScenarioOutput, ScenarioRuntimeError> {
         let result = self.expression.execute(data)?;
         let with_var = data.with_new_var(&self.var_name, result);
-        self.rest.run(&with_var)
+        self.rest.run(&with_var).await
     }
 }
 
@@ -46,6 +49,7 @@ mod tests {
         scenariomodel::{Node, NodeId},
     };
     use serde_json::json;
+    use tokio_test::block_on;
 
     #[test]
     fn test_outputs() -> Result<(), Box<dyn std::error::Error>> {
@@ -62,7 +66,7 @@ mod tests {
         let input = json!("terefere");
         let output = json!("terefere-suffix");
 
-        let result = compiled.run(&VarContext::default_context_for_value(input))?;
+        let result = block_on(compiled.run(&VarContext::default_context_for_value(input)))?;
         assert_eq!(result.var_in_sink(&sink_id, output_name), [Some(&output)]);
 
         Ok(())

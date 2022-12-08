@@ -1,15 +1,15 @@
 use regex::Regex;
 use serde::Serialize;
 use serde_json::Value;
-use std::{collections::HashMap, rc::Rc};
+use std::{collections::HashMap, sync::Arc};
 
 use crate::scenariomodel::{Node, NodeId};
 use once_cell::sync::Lazy;
 
 /// Data passed through scenario
-/// We keep Rc<VarValue> as value in map to avoid excessive cloning.
+/// We keep Arc<VarValue> as value in map to avoid excessive cloning.
 #[derive(Clone)]
-pub struct VarContext(HashMap<String, Rc<VarValue>>);
+pub struct VarContext(HashMap<String, Arc<VarValue>>);
 
 pub const DEFAULT_INPUT_NAME: &str = "input";
 
@@ -21,7 +21,7 @@ impl VarContext {
     pub fn default_context_for_value(value: Value) -> VarContext {
         VarContext(HashMap::from([(
             DEFAULT_INPUT_NAME.to_string(),
-            Rc::new(value),
+            Arc::new(value),
         )]))
     }
     //this is mainly for computing ScenarioOutput and for passing to expressions
@@ -35,7 +35,7 @@ impl VarContext {
     }
     pub fn with_new_var(&self, name: &str, value: Value) -> VarContext {
         let mut result = self.clone();
-        result.0.insert(String::from(name), Rc::new(value));
+        result.0.insert(String::from(name), Arc::new(value));
         result
     }
 }
@@ -153,8 +153,8 @@ pub enum ScenarioRuntimeError {
     CannotParseInput(serde_json::Error),
     InvalidSwitchType(Value),
     InvalidFilterType(Value),
-    ExpressionError(Box<dyn std::error::Error>),
-    CustomNodeError(Box<dyn std::error::Error>),
+    ExpressionError(Box<dyn std::error::Error + Send>),
+    CustomNodeError(Box<dyn std::error::Error + Send>),
 }
 
 impl std::fmt::Display for ScenarioRuntimeError {

@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 
+use async_trait::async_trait;
+
 use self::data::{
     ScenarioCompilationError, ScenarioOutput, ScenarioRuntimeError, VarContext, VarValue,
 };
@@ -9,8 +11,9 @@ pub mod data;
 
 ///This is the main API of the rusty-nussknacker library. It represents 'compiled' scenario,
 ///which can transform input - VarContext into ScenarioOutput
+#[async_trait]
 pub trait Interpreter: Sync + Send {
-    fn run(&self, data: &VarContext) -> Result<ScenarioOutput, ScenarioRuntimeError>;
+    async fn run(&self, data: &VarContext) -> Result<ScenarioOutput, ScenarioRuntimeError>;
 }
 
 pub type CompilationResult = Result<Box<dyn Interpreter>, ScenarioCompilationError>;
@@ -21,8 +24,9 @@ pub type CompilationResult = Result<Box<dyn Interpreter>, ScenarioCompilationErr
 ///Note, that the API allows next_part to be invoked 0..many times, which allows to implement different types
 ///of components, from filter to for-each types.
 ///Sample implementation of for-each is provided in customnodes module.
+#[async_trait]
 pub trait CustomNode: Sync + Send {
-    fn run(
+    async fn run(
         &self,
         output_var: &str,
         parameters: &HashMap<String, VarValue>,
